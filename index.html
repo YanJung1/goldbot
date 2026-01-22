@@ -1,67 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BTC RECOVERY AI - V6 WITH TP/SL</title>
+    <title>GOLD PRO AI - V7 TREND FOLLOWER</title>
     <style>
-        body { background: #0b0e11; color: white; font-family: sans-serif; text-align: center; padding: 10px; }
-        .card { border: 2px solid #f3ba2f; border-radius: 15px; padding: 15px; background: #1e2329; }
-        .price { font-size: 40px; font-weight: bold; color: #f3ba2f; margin: 10px 0; }
-        .status-on { color: #00ff88; font-weight: bold; }
-        .log-box { text-align: left; background: #000; padding: 10px; height: 150px; overflow-y: auto; font-size: 11px; color: #00ff88; border: 1px solid #333; margin-top: 10px; }
+        :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; margin: 0; }
+        .card { border: 2px solid var(--gold); border-radius: 20px; padding: 20px; background: var(--card); max-width: 500px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .bot-title { color: var(--gold); font-size: 24px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+        #botStatus { font-size: 14px; margin-bottom: 15px; font-weight: bold; }
+        .status-off { color: var(--red); }
+        .status-on { color: var(--green); }
+        .price-container { background: #000; border-radius: 10px; padding: 20px; margin: 15px 0; }
+        .price-label { font-size: 12px; color: #848e9c; text-transform: uppercase; }
+        .price { font-size: 48px; font-weight: bold; color: var(--gold); }
+        .indicators { display: flex; justify-content: space-around; font-size: 13px; color: #848e9c; margin-bottom: 15px; border-top: 1px solid #333; pt: 10px; }
+        .indicator-box b { color: white; }
+        .log-box { text-align: left; background: #000; padding: 15px; height: 180px; overflow-y: auto; font-size: 12px; color: var(--green); border: 1px solid #333; border-radius: 10px; line-height: 1.6; }
+        .btn-sync { background: var(--gold); border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body onload="initBot()">
+
     <div class="card">
-        <div id="botStatus" style="font-size: 12px; color: #ff4d4d;">🔴 GÕ /START ĐỂ NHẬN KÈO CÓ TP/SL</div>
-        <div id="btcPrice" class="price">0.00</div>
-        <div id="info" style="font-size: 13px; color: #848e9c;">Sync: -72.77 | Chờ tín hiệu...</div>
-        <div id="logs" class="log-box">> Hệ thống sẵn sàng.</div>
+        <div class="bot-title">👑 GOLD PRO V7</div>
+        <div id="botStatus" class="status-off">🔴 GÕ /START TRÊN TELEGRAM ĐỂ KÍCH HOẠT</div>
+
+        <div class="price-container">
+            <div class="price-label">XAU/USD (Real-time)</div>
+            <div id="goldPrice" class="price">0.00</div>
+        </div>
+
+        <div class="indicators">
+            <div class="indicator-box">RSI (15m): <b id="rsiVal">--</b></div>
+            <div class="indicator-box">Trend: <b id="trendVal">--</b></div>
+        </div>
+
+        <div id="logs" class="log-box">> Hệ thống đã sẵn sàng...<br>> Đang chờ kết nối Telegram...</div>
+        
+        <div style="font-size: 10px; color: #555; margin-top: 15px;">Target: TP 30 Giá | SL 15 Giá | Timeframe: 15M</div>
     </div>
 
     <script>
+        // CẤU HÌNH BOT (Thay Token và ID của bạn vào đây)
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
-        let isRunning = false, lastUpdateId = 0, priceOffset = -72.77;
-        let currentPrice = 0, currentRsi = 0, lastAction = "";
 
-        function initBot() { setInterval(checkTele, 1500); }
+        let isRunning = false;
+        let lastUpdateId = 0;
+        let priceOffset = 0;
+        let currentPrice = 0;
+        let lastAction = "";
+
+        function initBot() {
+            addLog("Đang khởi chạy listener...");
+            setInterval(checkTele, 2000); // Kiểm tra lệnh Telegram mỗi 2 giây
+        }
 
         async function updateData() {
             if (!isRunning) return;
             try {
-                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=50`);
+                // Lấy dữ liệu nến 15 phút từ Binance (PAXGUSDT là token Gold khớp nhất)
+                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=200`);
                 const d = await r.json();
-                const prices = d.map(x => parseFloat(x[4]));
+                const prices = d.map(x => parseFloat(x[4])); // Lấy giá đóng cửa
                 currentPrice = prices[prices.length - 1];
 
-                let g = 0, l = 0;
+                // 1. TÍNH RSI (14)
+                let gains = 0, losses = 0;
                 for (let i = prices.length - 14; i < prices.length; i++) {
                     let diff = prices[i] - prices[i-1];
-                    if (diff >= 0) g += diff; else l -= diff;
+                    if (diff >= 0) gains += diff; else losses -= diff;
                 }
-                currentRsi = 100 - (100 / (1 + (g / l)));
+                let rsi = 100 - (100 / (1 + (gains / losses)));
 
-                document.getElementById('btcPrice').innerText = (currentPrice + priceOffset).toFixed(2);
-                document.getElementById('info').innerText = `M1: ${currentRsi.toFixed(2)} | RSI Target: 40/65`;
+                // 2. TÍNH EMA 200 (Để xác định xu hướng dài hạn)
+                let ema200 = prices.reduce((a, b) => a + b, 0) / prices.length;
+                let isUptrend = currentPrice > ema200;
 
-                // Logic báo kèo kèm TP/SL tự động
-                if (currentRsi <= 40 && lastAction !== "BUY") {
-                    let entry = currentPrice + priceOffset;
-                    let tp = entry + 80; // TP cách 80 giá
-                    let sl = entry - 100; // SL cách 100 giá
-                    sendTele(`💎 [KÈO BUY]\n📍 Entry: ${entry.toFixed(2)}\n🎯 TP: ${tp.toFixed(2)}\n🛡️ SL: ${sl.toFixed(2)}\n📊 RSI: ${currentRsi.toFixed(2)}`);
+                // Cập nhật giao diện
+                let displayPrice = (currentPrice + priceOffset).toFixed(2);
+                document.getElementById('goldPrice').innerText = displayPrice;
+                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
+                document.getElementById('trendVal').innerText = isUptrend ? "TĂNG" : "GIẢM";
+                document.getElementById('trendVal').style.color = isUptrend ? "#00ff88" : "#ff4d4d";
+
+                // 3. LOGIC VÀO LỆNH (Tối ưu Winrate theo Trend)
+                
+                // Kèo BUY: Xu hướng TĂNG + RSI đi vào vùng quá bán (Pullback)
+                if (isUptrend && rsi <= 35 && lastAction !== "BUY") {
+                    let entry = parseFloat(displayPrice);
+                    let tp = entry + 30; // TP 30 giá
+                    let sl = entry - 15; // SL 15 giá
+                    
+                    let msg = `🔵 [GOLD BUY SIGNAL]\n📈 Trend: TĂNG (Thuận chiều)\n📍 Entry: ${entry}\n🎯 TP: ${tp.toFixed(2)}\n🛡️ SL: ${sl.toFixed(2)}\n📊 RSI: ${rsi.toFixed(2)}`;
+                    sendTele(msg);
+                    addLog("Phát hiện tín hiệu BUY. Đã gửi Telegram.");
                     lastAction = "BUY";
-                } 
-                else if (currentRsi >= 65 && lastAction !== "SELL") {
-                    let entry = currentPrice + priceOffset;
-                    let tp = entry - 80; 
-                    let sl = entry + 100;
-                    sendTele(`💎 [KÈO SELL]\n📍 Entry: ${entry.toFixed(2)}\n🎯 TP: ${tp.toFixed(2)}\n🛡️ SL: ${sl.toFixed(2)}\n📊 RSI: ${currentRsi.toFixed(2)}`);
+                }
+
+                // Kèo SELL: Xu hướng GIẢM + RSI đi vào vùng quá mua (Hồi mã thương)
+                else if (!isUptrend && rsi >= 65 && lastAction !== "SELL") {
+                    let entry = parseFloat(displayPrice);
+                    let tp = entry - 30; // TP 30 giá
+                    let sl = entry + 15; // SL 15 giá
+                    
+                    let msg = `🔴 [GOLD SELL SIGNAL]\n📉 Trend: GIẢM (Thuận chiều)\n📍 Entry: ${entry}\n🎯 TP: ${tp.toFixed(2)}\n🛡️ SL: ${sl.toFixed(2)}\n📊 RSI: ${rsi.toFixed(2)}`;
+                    sendTele(msg);
+                    addLog("Phát hiện tín hiệu SELL. Đã gửi Telegram.");
                     lastAction = "SELL";
                 }
-            } catch (e) {}
+
+            } catch (e) {
+                console.error("Data Error:", e);
+            }
         }
 
         async function checkTele() {
@@ -71,29 +124,40 @@
                 if (d.result && d.result.length > 0) {
                     for (let u of d.result) {
                         lastUpdateId = u.update_id;
+                        if (!u.message || !u.message.text) continue;
                         const m = u.message.text.toLowerCase();
 
                         if (m === "/start") {
                             isRunning = true;
-                            setInterval(updateData, 2000);
-                            document.getElementById('botStatus').innerHTML = "🟢 ĐANG QUÉT KÈO KÈM TP/SL...";
+                            setInterval(updateData, 3000); // Cập nhật dữ liệu mỗi 3 giây
+                            document.getElementById('botStatus').innerHTML = "🟢 BOT ĐANG QUÉT KÈO XAU/USD (M15)";
                             document.getElementById('botStatus').className = "status-on";
-                            sendTele("🚀 BOT V6 READY!\nKèo sẽ kèm sẵn TP/SL để bro copy.");
-                        }
-                        else if (m === "/tp" || m === "/sl") {
-                            lastAction = ""; 
-                            sendTele(`✅ Đã lưu ${m.toUpperCase()}. Chờ kèo mới...`);
+                            addLog("Bot đã được kích hoạt!");
+                            sendTele("🚀 GOLD PRO V7 READY!\nĐang quét khung 15M thuận xu hướng.\nTP: 30 giá | SL: 15 giá.");
                         }
                         else if (m.startsWith("/sync")) {
-                            let mt5 = parseFloat(m.split(" ")[1]);
-                            if (mt5) { priceOffset = mt5 - currentPrice; sendTele(`🎯 Đã khớp giá MT5!`); }
+                            let val = parseFloat(m.split(" ")[1]);
+                            if (val) {
+                                priceOffset = val - currentPrice;
+                                addLog(`Đã Sync giá theo sàn: ${val}`);
+                                sendTele(`🎯 Đã đồng bộ giá khớp với sàn của bạn: ${val}`);
+                            }
                         }
                     }
                 }
             } catch (e) {}
         }
 
-        function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`); }
+        function sendTele(m) {
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`);
+        }
+
+        function addLog(txt) {
+            const logs = document.getElementById('logs');
+            const now = new Date().toLocaleTimeString();
+            logs.innerHTML += `<br>> [${now}] ${txt}`;
+            logs.scrollTop = logs.scrollHeight;
+        }
     </script>
 </body>
 </html>
