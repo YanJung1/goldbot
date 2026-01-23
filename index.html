@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD PRO V12.3 - FULL FIX</title>
+    <title>GOLD PRO V12.4 - ULTIMATE FIX</title>
     <style>
         :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
         body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
@@ -22,14 +22,14 @@
 <body onload="initBot()">
 
     <div class="card">
-        <div style="color: var(--gold); font-weight: bold; font-size: 18px;">GOLD V12.3 - TRADER AI</div>
-        <div id="botStatus" style="color: var(--red); margin: 5px 0; font-size: 11px;">🔴 CHỜ KÍCH HOẠT /START</div>
+        <div style="color: var(--gold); font-weight: bold; font-size: 18px;">GOLD V12.4 - AI TRADER</div>
+        <div id="botStatus" style="color: var(--green); margin: 5px 0; font-size: 11px;">🟢 ĐANG HOẠT ĐỘNG</div>
         
         <div id="goldPrice" class="price">0.00</div>
         
         <div id="newsMode" class="mode-box">
-            Dự báo: <b id="forecastText" style="color: var(--green);">ỔN ĐỊNH</b><br>
-            <small id="newsDetail">Đang phân tích tin đòn bẩy 1:200...</small>
+            Dự báo: <b id="forecastText" style="color: var(--red);">KHÔNG OK (1:200)</b><br>
+            <small id="newsDetail">Đã khóa chiều BUY - Chỉ canh SELL.</small>
         </div>
 
         <div class="indicators">
@@ -40,26 +40,30 @@
 
         <div class="chat-container">
             <div style="font-size: 11px; color: var(--gold); margin-bottom: 5px; font-weight: bold;">🤖 HỎI AI CAO THỦ:</div>
-            <div id="chatBox">Chào bro! Code đã fix xong lệnh Sync. Cần hỏi gì không?</div>
+            <div id="chatBox">Chào bro! Giá hiện tại đã chuẩn MT5 chưa? Gõ /sync [giá] để chỉnh nhé!</div>
             <div class="chat-input">
                 <input type="text" id="userInput" placeholder="Vàng sập hay bay bro?">
                 <button onclick="askAI()">Hỏi</button>
             </div>
         </div>
 
-        <div id="logs" class="log-box">> AI đang sẵn sàng tác chiến...</div>
+        <div id="logs" class="log-box">> AI đang quét tin & đợi lệnh...</div>
     </div>
 
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
-        const GEMINI_API_KEY = "AIzaSyCGG2W6jOSjJamkPx0-2eo4qkotbr7RDXE";
+        const GEMINI_API_KEY = "AIzaSyCGG2W6jOSjJamkPx0-2eo4qkotbr7RDXE"; // Key từ screenshot của bạn
 
-        let isRunning = false, lastUpdateId = 0, priceOffset = 0;
+        let isRunning = true, lastUpdateId = 0, priceOffset = 0;
         let lastAction = "", lastHeartbeat = Date.now(), basePrice = 0;
-        let tradeDirection = "BOTH";
+        let tradeDirection = "SELL_ONLY";
 
-        function initBot() { setInterval(checkTele, 2000); }
+        function initBot() { 
+            setInterval(checkTele, 2000); 
+            setInterval(updateData, 4000); 
+            addLog("Hệ thống khởi động thành công.");
+        }
 
         async function askAI() {
             const input = document.getElementById('userInput');
@@ -74,19 +78,18 @@
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "Bạn là cao thủ trade vàng chuyên nghiệp, hãy trả lời ngắn gọn và hài hước: " + userMsg }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Bạn là một trader vàng chuyên nghiệp, trả lời ngắn gọn, hài hước về câu hỏi: " + userMsg }] }] })
                 });
                 const data = await response.json();
                 const aiMsg = data.candidates[0].content.parts[0].text;
                 chatBox.innerHTML += `<br><b style="color:var(--green)">AI:</b> ${aiMsg}`;
                 chatBox.scrollTop = chatBox.scrollHeight;
             } catch (e) {
-                chatBox.innerHTML += `<br><i style="color:red">Lỗi: Kiểm tra API Key trên web.</i>`;
+                chatBox.innerHTML += `<br><i style="color:red">Lỗi: AI đang bận. Đợi 10s nhé!</i>`;
             }
         }
 
         async function updateData() {
-            if (!isRunning) return;
             try {
                 const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=200`);
                 const d = await r.json();
@@ -108,6 +111,7 @@
                 document.getElementById('volatVal').innerText = range.toFixed(1);
                 document.getElementById('marketType').innerText = isSideway ? "SIDEWAY" : "CÓ SÓNG";
 
+                // Logic tín hiệu
                 if (isSideway) {
                     if (rsi <= 30 && isGreen && lastAction !== "S_BUY") { sendAction("SIDE BUY", (basePrice + priceOffset), 15, 10); lastAction = "S_BUY"; }
                     else if (rsi >= 70 && !isGreen && lastAction !== "S_SELL") { sendAction("SIDE SELL", (basePrice + priceOffset), -15, 10); lastAction = "S_SELL"; }
@@ -115,22 +119,13 @@
                     if (tradeDirection !== "SELL_ONLY" && rsi <= 35 && isGreen && lastAction !== "T_BUY") { sendAction("TREND BUY", (basePrice + priceOffset), 30, 15); lastAction = "T_BUY"; }
                     else if (tradeDirection !== "BUY_ONLY" && rsi >= 65 && !isGreen && lastAction !== "T_SELL") { sendAction("TREND SELL", (basePrice + priceOffset), -30, 15); lastAction = "T_SELL"; }
                 }
-
-                if (Date.now() - lastHeartbeat > 300000) { checkNews(); lastHeartbeat = Date.now(); }
             } catch (e) {}
-        }
-
-        async function checkNews() {
-            tradeDirection = "SELL_ONLY";
-            document.getElementById('forecastText').innerText = "KHÔNG OK (1:200)";
-            document.getElementById('forecastText').style.color = "var(--red)";
-            sendTele("🔮 [AI FORECAST] Tin 1:200 KHÔNG OK. Chỉ canh SELL.");
         }
 
         function sendAction(type, entry, tpD, slD) {
             let tp = (entry + tpD).toFixed(2);
             let sl = type.includes("SELL") ? (entry + slD).toFixed(2) : (entry - slD).toFixed(2);
-            sendTele(`💎 [${type}]\n📍 Entry: ${entry.toFixed(2)}\n🎯 TP: ${tp}\n🛡️ SL: ${sl}\n⚠️ Lưu ý: Lãi 10 giá dời SL về Entry!`);
+            sendTele(`💎 [${type}]\n📍 Entry: ${entry.toFixed(2)}\n🎯 TP: ${tp}\n🛡️ SL: ${sl}\n⚠️ Lưu ý: Dời SL về Entry khi lãi!`);
         }
 
         async function checkTele() {
@@ -140,26 +135,25 @@
                 if (d.result) {
                     for (let u of d.result) {
                         lastUpdateId = u.update_id;
-                        const m = u.message.text.toLowerCase();
-                        if (m === "/start") {
-                            isRunning = true; setInterval(updateData, 4000);
-                            document.getElementById('botStatus').innerText = "🟢 BOT V12.3 ONLINE";
-                            sendTele("🏆 GOLD V12.3 FIXED!\n- Lệnh /sync đã hoạt động.\n- AI Gemini 1.5 đã sẵn sàng.");
-                        }
+                        const m = u.message.text.trim().toLowerCase();
+                        
                         if (m.startsWith("/sync")) {
-                            const mt5 = parseFloat(m.split(" ")[1]);
-                            if (!isNaN(mt5)) {
-                                priceOffset = mt5 - basePrice;
-                                sendTele(`🎯 Đồng bộ thành công!\nGiá sàn MT5: ${mt5}\nChênh lệch đã nạp: ${priceOffset.toFixed(2)}`);
+                            const val = parseFloat(m.split(" ")[1]);
+                            if (!isNaN(val)) {
+                                priceOffset = val - basePrice;
+                                sendTele(`🎯 Đã đồng bộ giá MT5: ${val}\nChênh lệch sàn: ${priceOffset.toFixed(2)}`);
+                            } else {
+                                sendTele("⚠️ Thiếu giá MT5! Ví dụ: /sync 4983.38");
                             }
                         }
-                        if (m === "/ping") sendTele(`✅ Bot ổn định.\nRSI: ${document.getElementById('rsiVal').innerText}\nSóng: ${document.getElementById('volatVal').innerText}`);
+                        if (m === "/ping") sendTele(`✅ Bot OK!\nRSI: ${document.getElementById('rsiVal').innerText}\nBiến động: ${document.getElementById('volatVal').innerText}`);
                     }
                 }
             } catch (e) {}
         }
 
         function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`); }
+        function addLog(t) { document.getElementById('logs').innerHTML += `<br>> ${t}`; }
     </script>
 </body>
 </html>
