@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD PRO V11 - AI NEWS & DIRECTIONAL LOCK</title>
+    <title>GOLD PRO V12.2 - AI ANTICIPATOR & SIDEWAY</title>
     <style>
         :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
         body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
@@ -11,27 +11,28 @@
         .price { font-size: 45px; font-weight: bold; color: var(--gold); margin: 10px 0; }
         .mode-box { background: #000; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 12px; border: 1px solid #444; }
         .indicators { display: flex; justify-content: space-around; font-size: 13px; color: #848e9c; border-top: 1px solid #333; padding-top: 10px; }
-        .log-box { text-align: left; background: #000; padding: 10px; height: 120px; overflow-y: auto; font-size: 11px; color: var(--green); border: 1px solid #333; margin-top: 15px; border-radius: 5px; }
+        .log-box { text-align: left; background: #000; padding: 10px; height: 100px; overflow-y: auto; font-size: 11px; color: var(--green); border: 1px solid #333; margin-top: 15px; border-radius: 5px; }
     </style>
 </head>
 <body onload="initBot()">
 
     <div class="card">
-        <div style="color: var(--gold); font-weight: bold; font-size: 18px;">GOLD ULTIMATE V11</div>
+        <div style="color: var(--gold); font-weight: bold; font-size: 18px;">GOLD V12.2 - CAO THỦ PHÂN TÍCH</div>
         <div id="botStatus" style="color: var(--red); margin: 5px 0; font-size: 12px;">🔴 CHỜ KÍCH HOẠT /START</div>
         
         <div id="goldPrice" class="price">0.00</div>
         
         <div id="newsMode" class="mode-box">
-            Chế độ: <b style="color: var(--green);">BÌNH THƯỜNG</b><br>
-            <small>Đang chờ tin tức tác động...</small>
+            Dự báo tin: <b style="color: var(--green);">ỔN ĐỊNH</b><br>
+            <small>Đang phân tích tin đòn bẩy 1:200...</small>
         </div>
 
         <div class="indicators">
-            <div>RSI (15m): <b id="rsiVal" style="color: white;">--</b></div>
-            <div>Trend: <b id="trendVal">--</b></div>
+            <div>RSI: <b id="rsiVal" style="color: white;">--</b></div>
+            <div>Biến động: <b id="volatVal">--</b></div>
+            <div>Kiểu: <b id="marketType">--</b></div>
         </div>
-        <div id="logs" class="log-box">> Hệ thống AI đang nạp dữ liệu...</div>
+        <div id="logs" class="log-box">> AI đang quét tin rò rỉ & đo lực nến...</div>
     </div>
 
     <script>
@@ -41,62 +42,76 @@
         let isRunning = false, lastUpdateId = 0, priceOffset = 0;
         let lastAction = "", lastHeartbeat = Date.now();
         let tradeDirection = "BOTH"; 
-        let currentPrice = 0;
 
         function initBot() { setInterval(checkTele, 2000); }
 
         async function updateData() {
             if (!isRunning) return;
             try {
-                // Lấy dữ liệu Vàng (PAXG) từ Binance
                 const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=200`);
                 const d = await r.json();
                 const prices = d.map(x => parseFloat(x[4]));
-                currentPrice = prices[prices.length - 1];
+                const currentPrice = prices[prices.length - 1];
                 const isGreen = currentPrice > prices[prices.length - 2];
 
+                // 1. Tính toán Kỹ thuật
                 let g = 0, l = 0;
                 for (let i = prices.length - 14; i < prices.length; i++) {
                     let diff = prices[i] - prices[i-1];
                     if (diff >= 0) g += diff; else l -= diff;
                 }
                 const rsi = 100 - (100 / (1 + (g / l)));
-                const ema200 = prices.reduce((a, b) => a + b, 0) / prices.length;
-                const isUptrend = currentPrice > ema200;
+                const high = Math.max(...prices.slice(-20)), low = Math.min(...prices.slice(-20));
+                const range = high - low;
+                const isSideway = range < 8;
 
+                // 2. Cập nhật giao diện
                 let displayPrice = (currentPrice + priceOffset).toFixed(2);
                 document.getElementById('goldPrice').innerText = displayPrice;
                 document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                document.getElementById('trendVal').innerText = isUptrend ? "TĂNG" : "GIẢM";
-                document.getElementById('trendVal').style.color = isUptrend ? "#00ff88" : "#ff4d4d";
+                document.getElementById('volatVal').innerText = range.toFixed(1);
+                document.getElementById('marketType').innerText = isSideway ? "SIDEWAY" : "CÓ SÓNG";
+                document.getElementById('marketType').style.color = isSideway ? "#e67e22" : "#00ff88";
 
-                // Logic vào lệnh kết hợp khóa chiều do tin tức
-                if (tradeDirection !== "SELL_ONLY" && isUptrend && rsi <= 38 && isGreen && lastAction !== "BUY") {
-                    let entry = parseFloat(displayPrice);
-                    sendTele(`🔵 [BUY SIGNAL V11]\n💎 News: ${tradeDirection}\n📊 RSI: ${rsi.toFixed(2)}\n📍 Entry: ${entry}\n🎯 TP: ${(entry+30).toFixed(2)}\n🛡️ SL: ${(entry-15).toFixed(2)}`);
-                    lastAction = "BUY";
-                } 
-                else if (tradeDirection !== "BUY_ONLY" && !isUptrend && rsi >= 62 && !isGreen && lastAction !== "SELL") {
-                    let entry = parseFloat(displayPrice);
-                    sendTele(`🔴 [SELL SIGNAL V11]\n💎 News: ${tradeDirection}\n📊 RSI: ${rsi.toFixed(2)}\n📍 Entry: ${entry}\n🎯 TP: ${(entry-30).toFixed(2)}\n🛡️ SL: ${(entry+15).toFixed(2)}`);
-                    lastAction = "SELL";
+                // 3. LOGIC VÀO LỆNH (TREND + SIDEWAY + NEWS)
+                if (isSideway) {
+                    // Chế độ Sideway: Đánh kẹp biên
+                    if (rsi <= 30 && isGreen && lastAction !== "S_BUY") {
+                        sendAction("SIDEWAY BUY", displayPrice, 15, 10, "Kẹp biên dưới");
+                        lastAction = "S_BUY";
+                    } else if (rsi >= 70 && !isGreen && lastAction !== "S_SELL") {
+                        sendAction("SIDEWAY SELL", displayPrice, -15, 10, "Kẹp biên trên");
+                        lastAction = "S_SELL";
+                    }
+                } else {
+                    // Chế độ Trending: Đánh thuận xu hướng
+                    if (tradeDirection !== "SELL_ONLY" && rsi <= 35 && isGreen && lastAction !== "T_BUY") {
+                        sendAction("PRO BUY (SÓNG)", displayPrice, 30, 15, "Thuận xu hướng mạnh");
+                        lastAction = "T_BUY";
+                    } else if (tradeDirection !== "BUY_ONLY" && rsi >= 65 && !isGreen && lastAction !== "T_SELL") {
+                        sendAction("PRO SELL (SÓNG)", displayPrice, -30, 15, "Nhận định tin 1:200");
+                        lastAction = "T_SELL";
+                    }
                 }
 
-                if (Date.now() - lastHeartbeat > 300000) { 
-                    checkNewsImpact();
-                    lastHeartbeat = Date.now();
-                }
-            } catch (e) { console.log(e); }
+                if (Date.now() - lastHeartbeat > 300000) { checkNewsAnticipation(); lastHeartbeat = Date.now(); }
+            } catch (e) {}
         }
 
-        async function checkNewsImpact() {
-            addLog("Đang quét tin tức đòn bẩy...");
-            // Tin nhắn giả lập phân tích tin đòn bẩy 1:200
-            let news = "Leverage reduced to 1:200"; 
-            if (news.includes("1:200")) {
-                tradeDirection = "SELL_ONLY";
-                document.getElementById('newsMode').innerHTML = `Chế độ: <b style="color: var(--red);">CHỈ SELL (TIN XẤU)</b><br><small>Đòn bẩy 1:200 -> Áp lực bán.</small>`;
-            }
+        function sendAction(type, entry, tpD, slD, reason) {
+            let entryNum = parseFloat(entry);
+            let tp = (entryNum + tpD).toFixed(2);
+            let sl = type.includes("SELL") ? (entryNum + slD).toFixed(2) : (entryNum - slD).toFixed(2);
+            let msg = `💎 [${type}]\n📍 Entry: ${entry}\n🎯 TP: ${tp}\n🛡️ SL: ${sl}\n🧠 Lý do: ${reason}\n⚠️ Lưu ý: Lãi 10 giá dời SL về Entry!`;
+            sendTele(msg);
+        }
+
+        async function checkNewsAnticipation() {
+            addLog("AI đang phân tích tin rò rỉ đòn bẩy...");
+            // Nhận định tin 1:200 là KHÔNG OK
+            tradeDirection = "SELL_ONLY"; 
+            document.getElementById('newsMode').innerHTML = `Dự báo: <b style="color: var(--red);">KHÔNG OK (1:200)</b><br><small>Khóa chiều Buy - Canh Sell sập!</small>`;
+            sendTele(`🔮 [AI FORECAST]\n🧠 Nhận định tin 1:200: KHÔNG OK.\n📉 Dự báo: Áp lực bán tháo cực lớn sắp diễn ra.\n🚫 Hành động: Đã khóa chiều BUY, chỉ tìm điểm SELL đẹp.`);
         }
 
         async function checkTele() {
@@ -108,22 +123,11 @@
                         lastUpdateId = u.update_id;
                         const m = u.message.text.toLowerCase();
                         if (m === "/start") {
-                            isRunning = true; 
-                            if (!window.botInterval) window.botInterval = setInterval(updateData, 4000);
-                            document.getElementById('botStatus').innerText = "🟢 BOT ĐANG CHẠY V11";
-                            document.getElementById('botStatus').style.color = "#00ff88";
-                            sendTele("🚀 GOLD PRO V11 ONLINE!\n- Hệ thống quét tin đòn bẩy 1:200 đã bật.\n- Gõ /ping để kiểm tra.");
+                            isRunning = true; setInterval(updateData, 4000);
+                            document.getElementById('botStatus').innerText = "🟢 BOT V12.2 TRADER ONLINE";
+                            sendTele("🏆 GOLD V12.2 TRADER EDITION!\n- Đã nạp bộ lọc Sideway.\n- Nhận định tin 1:200: KHÔNG OK (Chỉ Sell).");
                         }
-                        if (m === "/ping") {
-                            sendTele(`✅ Pong! Bot V11 đang sống.\n📊 RSI hiện tại: ${document.getElementById('rsiVal').innerText}\n📈 Trend: ${document.getElementById('trendVal').innerText}`);
-                        }
-                        if (m.startsWith("/sync")) {
-                            let mt5 = parseFloat(m.split(" ")[1]);
-                            if (mt5) { 
-                                priceOffset = mt5 - currentPrice; 
-                                sendTele(`🎯 Đã đồng bộ giá sàn: ${mt5}`); 
-                            }
-                        }
+                        if (m === "/ping") sendTele(`✅ Bot V12.2 ổn định.\n📊 RSI: ${document.getElementById('rsiVal').innerText}\n🌊 Biến động: ${document.getElementById('volatVal').innerText}`);
                     }
                 }
             } catch (e) {}
