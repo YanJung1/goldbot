@@ -3,129 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD PRO V12.4 - ULTIMATE FIX</title>
+    <title>GOLD PRO V12.7 - TRACKING & SLE</title>
     <style>
         :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
         body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
-        .card { border: 2px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .card { border: 2px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 450px; margin: 10px auto; }
         .price { font-size: 45px; font-weight: bold; color: var(--gold); margin: 10px 0; }
-        .mode-box { background: #000; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 12px; border: 1px solid #444; }
-        .indicators { display: flex; justify-content: space-around; font-size: 13px; color: #848e9c; border-top: 1px solid #333; padding-top: 10px; }
-        .chat-container { background: #161a1e; border-radius: 10px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; }
-        #chatBox { height: 120px; overflow-y: auto; font-size: 12px; border-bottom: 1px solid #333; margin-bottom: 10px; padding-bottom: 5px; color: #ccc; }
-        .chat-input { display: flex; gap: 5px; }
-        input { flex: 1; background: #2b3139; border: none; color: white; padding: 10px; border-radius: 5px; outline: none; }
-        button { background: var(--gold); border: none; padding: 10px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; color: black; }
-        .log-box { text-align: left; background: #000; padding: 10px; height: 60px; overflow-y: auto; font-size: 11px; color: var(--green); border: 1px solid #333; margin-top: 15px; border-radius: 5px; }
+        .status-box { background: #000; padding: 10px; border-radius: 8px; font-size: 12px; border: 1px solid #333; margin-bottom: 10px; }
+        .log-box { text-align: left; background: #000; padding: 10px; height: 70px; overflow-y: auto; font-size: 11px; color: var(--green); border: 1px solid #333; margin-top: 10px; border-radius: 5px; }
     </style>
 </head>
 <body onload="initBot()">
 
     <div class="card">
-        <div style="color: var(--gold); font-weight: bold; font-size: 18px;">GOLD V12.4 - AI TRADER</div>
-        <div id="botStatus" style="color: var(--green); margin: 5px 0; font-size: 11px;">🟢 ĐANG HOẠT ĐỘNG</div>
-        
+        <div style="color: var(--gold); font-weight: bold;">GOLD V12.7 - QUẢN LÝ KÈO CHUẨN</div>
         <div id="goldPrice" class="price">0.00</div>
         
-        <div id="newsMode" class="mode-box">
-            Dự báo: <b id="forecastText" style="color: var(--red);">KHÔNG OK (1:200)</b><br>
-            <small id="newsDetail">Đã khóa chiều BUY - Chỉ canh SELL.</small>
+        <div class="status-box">
+            Trạng thái kèo: <b id="tradeStatus" style="color: var(--green);">ĐANG TRỐNG</b><br>
+            SL Hiện tại: <b id="currentSL" style="color: var(--red);">--</b>
         </div>
 
-        <div class="indicators">
-            <div>RSI: <b id="rsiVal" style="color: white;">--</b></div>
-            <div>Biến động: <b id="volatVal">--</b></div>
-            <div>Kiểu: <b id="marketType">--</b></div>
-        </div>
-
-        <div class="chat-container">
-            <div style="font-size: 11px; color: var(--gold); margin-bottom: 5px; font-weight: bold;">🤖 HỎI AI CAO THỦ:</div>
-            <div id="chatBox">Chào bro! Giá hiện tại đã chuẩn MT5 chưa? Gõ /sync [giá] để chỉnh nhé!</div>
-            <div class="chat-input">
-                <input type="text" id="userInput" placeholder="Vàng sập hay bay bro?">
-                <button onclick="askAI()">Hỏi</button>
-            </div>
-        </div>
-
-        <div id="logs" class="log-box">> AI đang quét tin & đợi lệnh...</div>
+        <div id="logs" class="log-box">> Hệ thống sẵn sàng...</div>
     </div>
 
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
-        const GEMINI_API_KEY = "AIzaSyCGG2W6jOSjJamkPx0-2eo4qkotbr7RDXE"; // Key từ screenshot của bạn
 
-        let isRunning = true, lastUpdateId = 0, priceOffset = 0;
-        let lastAction = "", lastHeartbeat = Date.now(), basePrice = 0;
-        let tradeDirection = "SELL_ONLY";
+        let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
+        let entryPrice = 0, activeSL = null, isTrading = false;
 
         function initBot() { 
             setInterval(checkTele, 2000); 
             setInterval(updateData, 4000); 
-            addLog("Hệ thống khởi động thành công.");
-        }
-
-        async function askAI() {
-            const input = document.getElementById('userInput');
-            const chatBox = document.getElementById('chatBox');
-            if (!input.value) return;
-            const userMsg = input.value;
-            chatBox.innerHTML += `<br><b style="color:var(--gold)">Bạn:</b> ${userMsg}`;
-            input.value = "";
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "Bạn là một trader vàng chuyên nghiệp, trả lời ngắn gọn, hài hước về câu hỏi: " + userMsg }] }] })
-                });
-                const data = await response.json();
-                const aiMsg = data.candidates[0].content.parts[0].text;
-                chatBox.innerHTML += `<br><b style="color:var(--green)">AI:</b> ${aiMsg}`;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            } catch (e) {
-                chatBox.innerHTML += `<br><i style="color:red">Lỗi: AI đang bận. Đợi 10s nhé!</i>`;
-            }
         }
 
         async function updateData() {
             try {
-                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=200`);
+                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=10`);
                 const d = await r.json();
-                const prices = d.map(x => parseFloat(x[4]));
-                basePrice = prices[prices.length - 1];
-                const isGreen = basePrice > prices[prices.length - 2];
+                basePrice = parseFloat(d[d.length - 1][4]);
+                let displayPrice = (basePrice + priceOffset).toFixed(2);
+                document.getElementById('goldPrice').innerText = displayPrice;
 
-                let g = 0, l = 0;
-                for (let i = prices.length - 14; i < prices.length; i++) {
-                    let diff = prices[i] - prices[i-1];
-                    if (diff >= 0) g += diff; else l -= diff;
-                }
-                const rsi = 100 - (100 / (1 + (g / l)));
-                const range = Math.max(...prices.slice(-20)) - Math.min(...prices.slice(-20));
-                const isSideway = range < 8;
-
-                document.getElementById('goldPrice').innerText = (basePrice + priceOffset).toFixed(2);
-                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                document.getElementById('volatVal').innerText = range.toFixed(1);
-                document.getElementById('marketType').innerText = isSideway ? "SIDEWAY" : "CÓ SÓNG";
-
-                // Logic tín hiệu
-                if (isSideway) {
-                    if (rsi <= 30 && isGreen && lastAction !== "S_BUY") { sendAction("SIDE BUY", (basePrice + priceOffset), 15, 10); lastAction = "S_BUY"; }
-                    else if (rsi >= 70 && !isGreen && lastAction !== "S_SELL") { sendAction("SIDE SELL", (basePrice + priceOffset), -15, 10); lastAction = "S_SELL"; }
-                } else {
-                    if (tradeDirection !== "SELL_ONLY" && rsi <= 35 && isGreen && lastAction !== "T_BUY") { sendAction("TREND BUY", (basePrice + priceOffset), 30, 15); lastAction = "T_BUY"; }
-                    else if (tradeDirection !== "BUY_ONLY" && rsi >= 65 && !isGreen && lastAction !== "T_SELL") { sendAction("TREND SELL", (basePrice + priceOffset), -30, 15); lastAction = "T_SELL"; }
+                // Tự động kiểm tra dính SL
+                if (isTrading && activeSL) {
+                    // Nếu là lệnh BUY (giá rớt xuống SL) hoặc SELL (giá vọt lên SL)
+                    // Ở đây bot mặc định kiểm tra theo giá hiện tại
+                    if (displayPrice == activeSL) {
+                        sendTele(`🚨 KÈO ĐÃ KẾT THÚC: Dính SL/SLE tại ${activeSL}`);
+                        resetTrade();
+                    }
                 }
             } catch (e) {}
         }
 
-        function sendAction(type, entry, tpD, slD) {
-            let tp = (entry + tpD).toFixed(2);
-            let sl = type.includes("SELL") ? (entry + slD).toFixed(2) : (entry - slD).toFixed(2);
-            sendTele(`💎 [${type}]\n📍 Entry: ${entry.toFixed(2)}\n🎯 TP: ${tp}\n🛡️ SL: ${sl}\n⚠️ Lưu ý: Dời SL về Entry khi lãi!`);
+        function resetTrade() {
+            isTrading = false; activeSL = null; entryPrice = 0;
+            document.getElementById('tradeStatus').innerText = "ĐANG TRỐNG";
+            document.getElementById('currentSL').innerText = "--";
         }
 
         async function checkTele() {
@@ -137,23 +74,40 @@
                         lastUpdateId = u.update_id;
                         const m = u.message.text.trim().toLowerCase();
                         
+                        // 1. SYNC VÀ LƯU ENTRY
                         if (m.startsWith("/sync")) {
-                            const val = parseFloat(m.split(" ")[1]);
-                            if (!isNaN(val)) {
-                                priceOffset = val - basePrice;
-                                sendTele(`🎯 Đã đồng bộ giá MT5: ${val}\nChênh lệch sàn: ${priceOffset.toFixed(2)}`);
-                            } else {
-                                sendTele("⚠️ Thiếu giá MT5! Ví dụ: /sync 4983.38");
-                            }
+                            entryPrice = parseFloat(m.split(" ")[1]);
+                            priceOffset = entryPrice - basePrice;
+                            isTrading = true;
+                            document.getElementById('tradeStatus').innerText = "ĐANG CHẠY";
+                            sendTele(`🎯 Đã khớp Entry: ${entryPrice}. Bot bắt đầu theo dõi.`);
                         }
-                        if (m === "/ping") sendTele(`✅ Bot OK!\nRSI: ${document.getElementById('rsiVal').innerText}\nBiến động: ${document.getElementById('volatVal').innerText}`);
+
+                        // 2. CÀI SL ENTRY THÔNG MINH (Ví dụ: /sle 1 -> Cách entry 1 giá)
+                        if (m.startsWith("/sle")) {
+                            if (!isTrading) return sendTele("⚠️ Không có kèo nào đang chạy!");
+                            let offset = parseFloat(m.split(" ")[1]) || 0;
+                            // Giả sử đang lãi, bot tự tính SL bảo vệ
+                            activeSL = (entryPrice + offset).toFixed(2);
+                            document.getElementById('currentSL').innerText = activeSL;
+                            sendTele(`🛡️ Đã cài SL Entry: ${activeSL}. (Entry ${entryPrice} + ${offset})`);
+                        }
+
+                        // 3. XÁC NHẬN XONG KÈO (Dùng khi đã chốt tay hoặc dính TP)
+                        if (m === "/done") {
+                            resetTrade();
+                            sendTele("✅ Đã xóa dữ liệu kèo cũ. Sẵn sàng cho kèo mới!");
+                        }
+
+                        if (m === "/ping") {
+                            sendTele(`📊 Trạng thái: ${isTrading ? "Đang gồng" : "Đang trống"}\nEntry: ${entryPrice}\nSL: ${activeSL || "--"}`);
+                        }
                     }
                 }
             } catch (e) {}
         }
 
         function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`); }
-        function addLog(t) { document.getElementById('logs').innerHTML += `<br>> ${t}`; }
     </script>
 </body>
 </html>
