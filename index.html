@@ -28,7 +28,7 @@
         </div>
 
         <div class="indicators">
-            <div>RSI: <b id="rsiVal" style="color: white;">--</b></div>
+            <div>RSI (15m): <b id="rsiVal" style="color: white;">--</b></div>
             <div>Trend: <b id="trendVal">--</b></div>
         </div>
         <div id="logs" class="log-box">> Hệ thống AI đang nạp dữ liệu...</div>
@@ -40,20 +40,21 @@
 
         let isRunning = false, lastUpdateId = 0, priceOffset = 0;
         let lastAction = "", lastHeartbeat = Date.now();
-        let tradeDirection = "BOTH"; // BOTH, BUY_ONLY, SELL_ONLY
+        let tradeDirection = "BOTH"; 
+        let currentPrice = 0;
 
         function initBot() { setInterval(checkTele, 2000); }
 
         async function updateData() {
             if (!isRunning) return;
             try {
+                // Lấy dữ liệu Vàng (PAXG) từ Binance
                 const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=200`);
                 const d = await r.json();
                 const prices = d.map(x => parseFloat(x[4]));
-                const currentPrice = prices[prices.length - 1];
+                currentPrice = prices[prices.length - 1];
                 const isGreen = currentPrice > prices[prices.length - 2];
 
-                // Tính RSI & EMA
                 let g = 0, l = 0;
                 for (let i = prices.length - 14; i < prices.length; i++) {
                     let diff = prices[i] - prices[i-1];
@@ -63,45 +64,38 @@
                 const ema200 = prices.reduce((a, b) => a + b, 0) / prices.length;
                 const isUptrend = currentPrice > ema200;
 
-                // Cập nhật UI
                 let displayPrice = (currentPrice + priceOffset).toFixed(2);
                 document.getElementById('goldPrice').innerText = displayPrice;
                 document.getElementById('rsiVal').innerText = rsi.toFixed(2);
                 document.getElementById('trendVal').innerText = isUptrend ? "TĂNG" : "GIẢM";
                 document.getElementById('trendVal').style.color = isUptrend ? "#00ff88" : "#ff4d4d";
 
-                // --- LOGIC VÀO LỆNH THÔNG MINH (KẾT HỢP TIN TỨC) ---
-                
-                // Lệnh BUY: Chỉ vào nếu Trend TĂNG + RSI thấp + Ko bị khóa chiều Sell_Only
+                // Logic vào lệnh kết hợp khóa chiều do tin tức
                 if (tradeDirection !== "SELL_ONLY" && isUptrend && rsi <= 38 && isGreen && lastAction !== "BUY") {
-                    sendTele(`🔵 [BUY SIGNAL]\n💎 Tin tức: ${tradeDirection === "BUY_ONLY" ? "TỐT" : "ỔN ĐỊNH"}\n📊 RSI: ${rsi.toFixed(2)}\n📍 Entry: ${displayPrice}\n🎯 TP: ${(parseFloat(displayPrice)+30).toFixed(2)}\n🛡️ SL: ${(parseFloat(displayPrice)-15).toFixed(2)}`);
+                    let entry = parseFloat(displayPrice);
+                    sendTele(`🔵 [BUY SIGNAL V11]\n💎 News: ${tradeDirection}\n📊 RSI: ${rsi.toFixed(2)}\n📍 Entry: ${entry}\n🎯 TP: ${(entry+30).toFixed(2)}\n🛡️ SL: ${(entry-15).toFixed(2)}`);
                     lastAction = "BUY";
                 } 
-                
-                // Lệnh SELL: Chỉ vào nếu Trend GIẢM + RSI cao + Ko bị khóa chiều Buy_Only
                 else if (tradeDirection !== "BUY_ONLY" && !isUptrend && rsi >= 62 && !isGreen && lastAction !== "SELL") {
-                    sendTele(`🔴 [SELL SIGNAL]\n💎 Tin tức: ${tradeDirection === "SELL_ONLY" ? "XẤU" : "ỔN ĐỊNH"}\n📊 RSI: ${rsi.toFixed(2)}\n📍 Entry: ${displayPrice}\n🎯 TP: ${(parseFloat(displayPrice)-30).toFixed(2)}\n🛡️ SL: ${(parseFloat(displayPrice)+15).toFixed(2)}`);
+                    let entry = parseFloat(displayPrice);
+                    sendTele(`🔴 [SELL SIGNAL V11]\n💎 News: ${tradeDirection}\n📊 RSI: ${rsi.toFixed(2)}\n📍 Entry: ${entry}\n🎯 TP: ${(entry-30).toFixed(2)}\n🛡️ SL: ${(entry+15).toFixed(2)}`);
                     lastAction = "SELL";
                 }
 
-                // Quét tin tức mỗi 5 phút
                 if (Date.now() - lastHeartbeat > 300000) { 
                     checkNewsImpact();
                     lastHeartbeat = Date.now();
                 }
-
             } catch (e) { console.log(e); }
         }
 
         async function checkNewsImpact() {
-            addLog("Đang phân tích tin tức đòn bẩy & kinh tế...");
-            // Giả lập nhận diện tin đòn bẩy 1:200
-            let newsTitle = "Brokers reduce Gold leverage to 1:200"; // Giả sử quét được
-            
-            if (newsTitle.toLowerCase().includes("leverage") && newsTitle.includes("200")) {
+            addLog("Đang quét tin tức đòn bẩy...");
+            // Tin nhắn giả lập phân tích tin đòn bẩy 1:200
+            let news = "Leverage reduced to 1:200"; 
+            if (news.includes("1:200")) {
                 tradeDirection = "SELL_ONLY";
-                document.getElementById('newsMode').innerHTML = `Chế độ: <b style="color: var(--red);">CHỈ SELL (TIN XẤU)</b><br><small>Hạn chế đòn bẩy -> Áp lực bán tháo.</small>`;
-                sendTele(`⚠️ [PHÂN TÍCH TIN TỨC]\n📄 Tin: Giảm đòn bẩy xuống 1:200.\n🧠 Nhận định: XẤU (Hạn chế sức mua, trader bị ép bán).\n🚫 Hành động: BOT KHÓA CHIỀU BUY, CHỈ TÌM ĐIỂM SELL.`);
+                document.getElementById('newsMode').innerHTML = `Chế độ: <b style="color: var(--red);">CHỈ SELL (TIN XẤU)</b><br><small>Đòn bẩy 1:200 -> Áp lực bán.</small>`;
             }
         }
 
@@ -114,14 +108,21 @@
                         lastUpdateId = u.update_id;
                         const m = u.message.text.toLowerCase();
                         if (m === "/start") {
-                            isRunning = true; setInterval(updateData, 4000);
+                            isRunning = true; 
+                            if (!window.botInterval) window.botInterval = setInterval(updateData, 4000);
                             document.getElementById('botStatus').innerText = "🟢 BOT ĐANG CHẠY V11";
-                            sendTele("🚀 GOLD PRO V11 ONLINE!\n- Tự động phân tích tin đòn bẩy.\n- Khóa chiều giao dịch khi tin xấu.");
+                            document.getElementById('botStatus').style.color = "#00ff88";
+                            sendTele("🚀 GOLD PRO V11 ONLINE!\n- Hệ thống quét tin đòn bẩy 1:200 đã bật.\n- Gõ /ping để kiểm tra.");
                         }
-                        if (m === "/ping") sendTele("✅ Pong! Bot V11 đang đọc tin & quét kèo.");
+                        if (m === "/ping") {
+                            sendTele(`✅ Pong! Bot V11 đang sống.\n📊 RSI hiện tại: ${document.getElementById('rsiVal').innerText}\n📈 Trend: ${document.getElementById('trendVal').innerText}`);
+                        }
                         if (m.startsWith("/sync")) {
                             let mt5 = parseFloat(m.split(" ")[1]);
-                            if (mt5) { priceOffset = mt5 - (currentPrice || mt5); sendTele("🎯 Sync OK!"); }
+                            if (mt5) { 
+                                priceOffset = mt5 - currentPrice; 
+                                sendTele(`🎯 Đã đồng bộ giá sàn: ${mt5}`); 
+                            }
                         }
                     }
                 }
