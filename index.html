@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD PRO V12.8 - FIX START</title>
+    <title>GOLD PRO V12.9 - ANTI-SLEEP</title>
     <style>
         :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
         body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
@@ -14,13 +14,12 @@
 </head>
 <body onload="initBot()">
     <div class="card">
-        <div style="color: var(--gold); font-size: 14px;">GOLD V12.8 - FIX LỖI TREO</div>
+        <div style="color: var(--gold); font-size: 14px;">GOLD V12.9 - CHỐNG NGỦ ĐÔNG</div>
         <div id="botStatusTag" class="status-tag" style="color: var(--red);">OFFLINE</div>
         <div id="goldPrice" class="price">0.00</div>
         <div id="indicators" style="font-size: 12px; color: #848e9c;">
             RSI: <b id="rsiVal">--</b> | Biến động: <b id="volatVal">--</b>
         </div>
-        <div id="logs" style="text-align:left; font-size:10px; color:var(--green); margin-top:15px; height:50px; overflow:hidden;">> Đang chờ lệnh...</div>
     </div>
 
     <script>
@@ -29,12 +28,14 @@
 
         let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
         let entryPrice = 0, activeSL = null, isTrading = false;
-        let mainLoop = null; // Quản lý vòng lặp tránh bị nhân đôi
+        let mainLoop = null;
 
         function initBot() {
-            addLog("Hệ thống khởi động...");
-            // Ép chạy kiểm tra Telegram liên tục
+            // Tự động kích hoạt vòng lặp ngay khi tải trang
+            if (mainLoop) clearInterval(mainLoop);
+            mainLoop = setInterval(updateData, 3000);
             setInterval(checkTele, 2000);
+            updateData();
         }
 
         async function updateData() {
@@ -44,7 +45,6 @@
                 const prices = d.map(x => parseFloat(x[4]));
                 basePrice = prices[prices.length - 1];
                 
-                // Tính RSI
                 let g = 0, l = 0;
                 for (let i = prices.length - 14; i < prices.length; i++) {
                     let diff = prices[i] - prices[i-1];
@@ -58,7 +58,7 @@
                 document.getElementById('volatVal').innerText = range.toFixed(1);
                 document.getElementById('botStatusTag').innerText = "ONLINE";
                 document.getElementById('botStatusTag').style.color = "var(--green)";
-            } catch (e) { console.log("Lỗi tải giá"); }
+            } catch (e) { document.getElementById('botStatusTag').innerText = "CONNECTING..."; }
         }
 
         async function checkTele() {
@@ -70,12 +70,15 @@
                         lastUpdateId = u.update_id;
                         const m = u.message.text.trim().toLowerCase();
                         
-                        // FIX LỆNH START: Xóa vòng lặp cũ, tạo vòng lặp mới
-                        if (m === "/start") {
-                            if (mainLoop) clearInterval(mainLoop);
-                            mainLoop = setInterval(updateData, 3000); 
-                            updateData(); // Chạy ngay lập tức 1 lần
-                            sendTele("✅ Bot V12.8 đã Reboot!\n📊 Đang quét dữ liệu Binance...");
+                        // Cấu trúc phản hồi cực nhanh cho lệnh /start và /ping
+                        if (m === "/start" || m === "/ping") {
+                            await updateData(); // Ép cập nhật dữ liệu mới nhất trước khi trả lời
+                            const rsi = document.getElementById('rsiVal').innerText;
+                            const vol = document.getElementById('volatVal').innerText;
+                            const status = isTrading ? "Đang gồng" : "Đang trống";
+                            const entry = isTrading ? entryPrice : 0;
+                            
+                            sendTele(`✅ Bot V12.9 Online\n📊 Trạng thái: ${status}\n💰 Giá: ${document.getElementById('goldPrice').innerText}\n📈 RSI: ${rsi}\n🌊 Sóng: ${vol}\n📍 Entry: ${entry}`);
                         }
 
                         if (m.startsWith("/sync")) {
@@ -85,15 +88,9 @@
                             sendTele(`🎯 Đã Sync Entry: ${entryPrice}`);
                         }
 
-                        if (m === "/ping") {
-                            const rsi = document.getElementById('rsiVal').innerText;
-                            const vol = document.getElementById('volatVal').innerText;
-                            sendTele(`📊 Trạng thái: ${isTrading ? "Đang gồng" : "Đang trống"}\n💰 Giá: ${document.getElementById('goldPrice').innerText}\n📈 RSI: ${rsi}\n🌊 Sóng: ${vol}`);
-                        }
-
                         if (m === "/done") {
                             isTrading = false; entryPrice = 0;
-                            sendTele("✅ Đã dọn dẹp kèo cũ.");
+                            sendTele("✅ Kèo đã kết thúc.");
                         }
                     }
                 }
@@ -101,7 +98,6 @@
         }
 
         function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`); }
-        function addLog(t) { document.getElementById('logs').innerHTML = "> " + t + "<br>" + document.getElementById('logs').innerHTML; }
     </script>
 </body>
 </html>
