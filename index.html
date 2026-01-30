@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD PRO V12.9 - ANTI-SLEEP</title>
+    <title>GOLD PRO V12.9</title>
     <style>
         :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
         body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
@@ -14,26 +14,21 @@
 </head>
 <body onload="initBot()">
     <div class="card">
-        <div style="color: var(--gold); font-size: 14px;">GOLD V12.9 - CHỐNG NGỦ ĐÔNG</div>
-        <div id="botStatusTag" class="status-tag" style="color: var(--red);">OFFLINE</div>
+        <div style="color: var(--gold); font-size: 14px;">GOLD V12.9 - LIVE</div>
+        <div id="botStatusTag" class="status-tag" style="color: var(--red);">CONNECTING...</div>
         <div id="goldPrice" class="price">0.00</div>
         <div id="indicators" style="font-size: 12px; color: #848e9c;">
-            RSI: <b id="rsiVal">--</b> | Biến động: <b id="volatVal">--</b>
+            RSI: <b id="rsiVal">--</b> | Sóng: <b id="volatVal">--</b>
         </div>
     </div>
 
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
+        let lastUpdateId = 0, priceOffset = 0, basePrice = 0, lastSignal = "none";
 
-        let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
-        let lastSignalType = "none"; 
-        let mainLoop = null;
-
-        function initBot() {
-            console.log("Bot đang khởi tạo...");
-            if (mainLoop) clearInterval(mainLoop);
-            mainLoop = setInterval(updateData, 3000);
+        async function initBot() {
+            setInterval(updateData, 3000);
             setInterval(checkTele, 2000);
             updateData();
         }
@@ -42,58 +37,46 @@
             try {
                 const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50`);
                 const d = await r.json();
-                const prices = d.map(x => parseFloat(x[4]));
-                basePrice = prices[prices.length - 1];
+                const p = d.map(x => parseFloat(x[4]));
+                basePrice = p[p.length - 1];
                 
                 let g = 0, l = 0;
-                for (let i = prices.length - 14; i < prices.length; i++) {
-                    let diff = prices[i] - prices[i-1];
+                for (let i = p.length - 14; i < p.length; i++) {
+                    let diff = p[i] - p[i-1];
                     if (diff >= 0) g += diff; else l -= diff;
                 }
                 const rsi = 100 - (100 / (1 + (g / l)));
-                const range = Math.max(...prices.slice(-20)) - Math.min(...prices.slice(-20));
+                const currentPrice = (basePrice + priceOffset).toFixed(2);
 
-                const finalPrice = (basePrice + priceOffset).toFixed(2);
-                document.getElementById('goldPrice').innerText = finalPrice;
+                document.getElementById('goldPrice').innerText = currentPrice;
                 document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                document.getElementById('volatVal').innerText = range.toFixed(1);
                 document.getElementById('botStatusTag').innerText = "ONLINE";
-                document.getElementById('botStatusTag').style.color = "var(--green)";
+                document.getElementById('botStatusTag').style.color = "#00ff88";
 
-                // TỰ ĐỘNG XUẤT LỆNH KHI RSI QUÁ MUA/QUÁ BÁN
-                if (rsi > 70 && lastSignalType !== "SELL") {
-                    sendTele(`🔴 TÍN HIỆU BÁN (SELL)\n💰 Giá: ${finalPrice}\n📈 RSI: ${rsi.toFixed(2)}`);
-                    lastSignalType = "SELL";
-                } else if (rsi < 30 && lastSignalType !== "BUY") {
-                    sendTele(`🟢 TÍN HIỆU MUA (BUY)\n💰 Giá: ${finalPrice}\n📈 RSI: ${rsi.toFixed(2)}`);
-                    lastSignalType = "BUY";
-                } else if (rsi > 40 && rsi < 60) {
-                    lastSignalType = "none"; // Reset để có thể bắt tín hiệu tiếp theo
-                }
-
-            } catch (e) { 
-                document.getElementById('botStatusTag').innerText = "CONNECTING..."; 
-            }
+                // TỰ ĐỘNG BẮN LỆNH
+                if (rsi > 70 && lastSignal !== "SELL") {
+                    sendTele(`🔴 BÁN (SELL)\nGiá: ${currentPrice}\nRSI: ${rsi.toFixed(2)}`);
+                    lastSignal = "SELL";
+                } else if (rsi < 30 && lastSignal !== "BUY") {
+                    sendTele(`🟢 MUA (BUY)\nGiá: ${currentPrice}\nRSI: ${rsi.toFixed(2)}`);
+                    lastSignal = "BUY";
+                } else if (rsi > 45 && rsi < 55) { lastSignal = "none"; }
+            } catch (e) {}
         }
 
         async function checkTele() {
             try {
                 const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
                 const d = await r.json();
-                if (d.result && d.result.length > 0) {
+                if (d.result) {
                     for (let u of d.result) {
                         lastUpdateId = u.update_id;
-                        if (!u.message || !u.message.text) continue;
-                        const m = u.message.text.trim().toLowerCase();
-                        
-                        if (m === "/start" || m === "/ping") {
-                            sendTele(`✅ V12.9 Online\n💰 Giá: ${document.getElementById('goldPrice').innerText}\n📈 RSI: ${document.getElementById('rsiVal').innerText}`);
-                        }
-                        if (m.startsWith("/sync")) {
-                            let p = parseFloat(m.split(" ")[1]);
-                            if(!isNaN(p)) {
-                                priceOffset = p - basePrice;
-                                sendTele(`🎯 Đã Sync giá về: ${p}`);
+                        if (u.message && u.message.text) {
+                            const m = u.message.text.toLowerCase();
+                            if (m === "/ping") sendTele("✅ Bot V12.9 vẫn đang chạy!");
+                            if (m.startsWith("/sync")) {
+                                let val = parseFloat(m.split(" ")[1]);
+                                if(!isNaN(val)) { priceOffset = val - basePrice; sendTele("🎯 Đã khớp giá!"); }
                             }
                         }
                     }
@@ -102,8 +85,7 @@
         }
 
         function sendTele(msg) {
-            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`)
-            .catch(err => console.error("Lỗi gửi Tele:", err));
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`);
         }
     </script>
 </body>
