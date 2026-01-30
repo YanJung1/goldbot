@@ -1,103 +1,104 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD PRO V12.9 - ANTI-SLEEP</title>
-    <style>
-        :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
-        body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
-        .card { border: 2px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 400px; margin: 10px auto; }
-        .price { font-size: 40px; font-weight: bold; color: var(--gold); margin: 10px 0; }
-        .status-tag { font-size: 10px; padding: 3px 8px; border-radius: 10px; background: #333; }
-    </style>
-</head>
-<body onload="initBot()">
-    <div class="card">
-        <div style="color: var(--gold); font-size: 14px;">GOLD V12.9 - CHỐNG NGỦ ĐÔNG</div>
-        <div id="botStatusTag" class="status-tag" style="color: var(--red);">OFFLINE</div>
-        <div id="goldPrice" class="price">0.00</div>
-        <div id="indicators" style="font-size: 12px; color: #848e9c;">
-            RSI: <b id="rsiVal">--</b> | Biến động: <b id="volatVal">--</b>
-        </div>
-    </div>
+<script>
+    const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
+    const CHAT_ID = "7994694689";
 
-    <script>
-        const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
-        const CHAT_ID = "7994694689";
+    let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
+    let entryPrice = 0, isTrading = false;
+    let mainLoop = null;
+    
+    // Biến chặn để tránh spam tin nhắn
+    let lastSignalType = "none"; 
 
-        let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
-        let entryPrice = 0, activeSL = null, isTrading = false;
-        let mainLoop = null;
+    function initBot() {
+        if (mainLoop) clearInterval(mainLoop);
+        mainLoop = setInterval(updateData, 3000); // Cập nhật dữ liệu mỗi 3s
+        setInterval(checkTele, 2000); // Kiểm tra lệnh Telegram mỗi 2s
+        updateData();
+    }
 
-        function initBot() {
-            // Tự động kích hoạt vòng lặp ngay khi tải trang
-            if (mainLoop) clearInterval(mainLoop);
-            mainLoop = setInterval(updateData, 3000);
-            setInterval(checkTele, 2000);
-            updateData();
+    async function updateData() {
+        try {
+            const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50`);
+            const d = await r.json();
+            const prices = d.map(x => parseFloat(x[4]));
+            basePrice = prices[prices.length - 1];
+            
+            let g = 0, l = 0;
+            for (let i = prices.length - 14; i < prices.length; i++) {
+                let diff = prices[i] - prices[i-1];
+                if (diff >= 0) g += diff; else l -= diff;
+            }
+            const rsi = 100 - (100 / (1 + (g / l)));
+            const range = Math.max(...prices.slice(-20)) - Math.min(...prices.slice(-20));
+
+            const finalPrice = (basePrice + priceOffset).toFixed(2);
+            document.getElementById('goldPrice').innerText = finalPrice;
+            document.getElementById('rsiVal').innerText = rsi.toFixed(2);
+            document.getElementById('volatVal').innerText = range.toFixed(1);
+            document.getElementById('botStatusTag').innerText = "ONLINE";
+            document.getElementById('botStatusTag').style.color = "var(--green)";
+
+            // --- LOGIC TỰ ĐỘNG XUẤT LỆNH ---
+            checkAutoSignal(rsi, finalPrice);
+
+        } catch (e) { 
+            document.getElementById('botStatusTag').innerText = "CONNECTING..."; 
         }
+    }
 
-        async function updateData() {
-            try {
-                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50`);
-                const d = await r.json();
-                const prices = d.map(x => parseFloat(x[4]));
-                basePrice = prices[prices.length - 1];
-                
-                let g = 0, l = 0;
-                for (let i = prices.length - 14; i < prices.length; i++) {
-                    let diff = prices[i] - prices[i-1];
-                    if (diff >= 0) g += diff; else l -= diff;
-                }
-                const rsi = 100 - (100 / (1 + (g / l)));
-                const range = Math.max(...prices.slice(-20)) - Math.min(...prices.slice(-20));
-
-                document.getElementById('goldPrice').innerText = (basePrice + priceOffset).toFixed(2);
-                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                document.getElementById('volatVal').innerText = range.toFixed(1);
-                document.getElementById('botStatusTag').innerText = "ONLINE";
-                document.getElementById('botStatusTag').style.color = "var(--green)";
-            } catch (e) { document.getElementById('botStatusTag').innerText = "CONNECTING..."; }
+    function checkAutoSignal(rsi, price) {
+        // Điều kiện Bán (RSI > 70)
+        if (rsi > 70 && lastSignalType !== "SELL") {
+            sendTele(`🔴 TÍN HIỆU BÁN (SELL)\n💰 Giá: ${price}\n📈 RSI: ${rsi.toFixed(2)}\n⚠️ Quá mua!`);
+            lastSignalType = "SELL";
+        } 
+        // Điều kiện Mua (RSI < 30)
+        else if (rsi < 30 && lastSignalType !== "BUY") {
+            sendTele(`🟢 TÍN HIỆU MUA (BUY)\n💰 Giá: ${price}\n📈 RSI: ${rsi.toFixed(2)}\n📉 Quá bán!`);
+            lastSignalType = "BUY";
         }
+        // Reset trạng thái khi RSI về vùng an toàn (tùy chọn)
+        else if (rsi > 45 && rsi < 55) {
+            lastSignalType = "none";
+        }
+    }
 
-        async function checkTele() {
-            try {
-                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
-                const d = await r.json();
-                if (d.result && d.result.length > 0) {
-                    for (let u of d.result) {
-                        lastUpdateId = u.update_id;
-                        const m = u.message.text.trim().toLowerCase();
-                        
-                        // Cấu trúc phản hồi cực nhanh cho lệnh /start và /ping
-                        if (m === "/start" || m === "/ping") {
-                            await updateData(); // Ép cập nhật dữ liệu mới nhất trước khi trả lời
-                            const rsi = document.getElementById('rsiVal').innerText;
-                            const vol = document.getElementById('volatVal').innerText;
-                            const status = isTrading ? "Đang gồng" : "Đang trống";
-                            const entry = isTrading ? entryPrice : 0;
-                            
-                            sendTele(`✅ Bot V12.9 Online\n📊 Trạng thái: ${status}\n💰 Giá: ${document.getElementById('goldPrice').innerText}\n📈 RSI: ${rsi}\n🌊 Sóng: ${vol}\n📍 Entry: ${entry}`);
-                        }
+    async function checkTele() {
+        try {
+            const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
+            const d = await r.json();
+            if (d.result && d.result.length > 0) {
+                for (let u of d.result) {
+                    lastUpdateId = u.update_id;
+                    if(!u.message) continue;
+                    const m = u.message.text.trim().toLowerCase();
+                    
+                    if (m === "/start" || m === "/ping") {
+                        const rsi = document.getElementById('rsiVal').innerText;
+                        const p = document.getElementById('goldPrice').innerText;
+                        sendTele(`✅ Bot V12.9 Online\n💰 Giá: ${p}\n📈 RSI: ${rsi}`);
+                    }
 
-                        if (m.startsWith("/sync")) {
-                            entryPrice = parseFloat(m.split(" ")[1]);
+                    if (m.startsWith("/sync")) {
+                        const val = parseFloat(m.split(" ")[1]);
+                        if(!isNaN(val)) {
+                            entryPrice = val;
                             priceOffset = entryPrice - basePrice;
                             isTrading = true;
                             sendTele(`🎯 Đã Sync Entry: ${entryPrice}`);
                         }
+                    }
 
-                        if (m === "/done") {
-                            isTrading = false; entryPrice = 0;
-                            sendTele("✅ Kèo đã kết thúc.");
-                        }
+                    if (m === "/done") {
+                        isTrading = false; entryPrice = 0;
+                        sendTele("✅ Kèo đã kết thúc.");
                     }
                 }
-            } catch (e) {}
-        }
+            }
+        } catch (e) {}
+    }
 
-        function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`); }
-    </script>
-</body>
-</html>
+    function sendTele(m) {
+        fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`);
+    }
+</script>
