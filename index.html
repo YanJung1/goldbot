@@ -1,41 +1,193 @@
-function execute(type, p) {
-            side = type; 
-            entry = p;
-            isTrading = true; 
-            hitTPs = [];
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOLD BINGX V16.0 - ULTIMATE</title>
+    <style>
+        :root { --bingx: #0052ff; --bg: #0b0e11; --card: #1e2329; --green: #00f0b5; --red: #ff3b30; --gold: #ffd700; --text: #848e9c; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 10px; margin: 0; }
+        .card { border: 1px solid #333; border-top: 4px solid var(--bingx); border-radius: 12px; padding: 15px; background: var(--card); max-width: 420px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .session-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-bottom: 10px; background: rgba(255, 215, 0, 0.1); color: var(--gold); border: 1px solid var(--gold); }
+        .price { font-size: 50px; font-weight: 800; color: white; margin: 5px 0; font-variant-numeric: tabular-nums; }
+        .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .box { background: #2b3139; padding: 10px; border-radius: 8px; font-size: 12px; border: 1px solid #383f47; }
+        .vol-bar { height: 6px; background: #444; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .vol-fill { height: 100%; background: var(--bingx); transition: 0.5s; width: 0%; }
+        .status { font-size: 12px; padding: 10px; border-radius: 8px; margin-top: 10px; background: rgba(0, 82, 255, 0.1); color: var(--bingx); border: 1px solid var(--bingx); font-weight: bold; }
+        .tp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+        .tp-box { background: #161a1e; padding: 8px; font-size: 11px; border-radius: 6px; border-left: 4px solid var(--green); text-align: left; }
+        .hit { background: var(--green) !important; color: #000 !important; font-weight: bold; transform: scale(1.02); }
+        .live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; display: inline-block; margin-right: 5px; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body onload="initBot()">
+    <div class="card">
+        <div id="sessionVal" class="session-tag">🕒 ĐANG QUÉT PHIÊN...</div>
+        <div id="goldPrice" class="price">0.00</div>
+        
+        <div class="macro-grid">
+            <div class="box"><span style="color:var(--text)">RSI (15m):</span><br><b id="rsiVal" style="font-size:16px">--</b></div>
+            <div class="box"><span style="color:var(--text)">TREND:</span><br><b id="trendVal" style="font-size:16px">--</b></div>
+            <div class="box" style="grid-column: span 2;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>LỰC THANH KHOẢN (VOL):</span>
+                    <b id="volPercent">0%</b>
+                </div>
+                <div class="vol-bar"><div id="volFill" class="vol-fill"></div></div>
+            </div>
+        </div>
+        
+        <div id="scanStatus" class="status"><span class="live-dot"></span>HỆ THỐNG ĐANG QUÉT TÍN HIỆU...</div>
 
-            // 1. TỰ ĐỘNG XÁC ĐỊNH KHOẢNG CÁCH TP (GAP)
-            // Nếu MarketTrend là UP/DOWN mạnh, dùng Gap lớn. Nếu Sideway dùng Gap nhỏ.
-            let gap = 3.5; // Mặc định
-            if (marketTrend !== "SIDEWAY") {
-                gap = 6.0; // Nới xa TP khi có xu hướng mạnh (Trend)
-            } else {
-                gap = 2.5; // Chốt cực nhanh khi thị trường đi ngang (Sideway)
-            }
+        <div id="tradeUI" style="display:none; border-top: 1px solid #444; margin-top: 15px; padding-top: 15px;">
+            <div id="zoneTag" style="font-size: 18px; font-weight: bold; color: var(--green); margin-bottom: 5px;"></div>
+            <div style="font-size: 13px; color: var(--text);">ENTRY ZONE: <b id="enVal" style="color:white">--</b></div>
+            <div style="font-size: 13px; color: var(--red); margin: 5px 0;">STOP LOSS: <b id="slVal">--</b></div>
+            <div class="tp-grid" id="tpGrid"></div>
+        </div>
+    </div>
 
-            // 2. TÍNH TOÁN VÙNG ENTRY (Zone 5 giá)
+    <script>
+        const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
+        const CHAT_ID = "7994694689";
+
+        let lastUpdateId = 0, priceOffset = 0, basePrice = 0, marketTrend = "SIDEWAY";
+        let isTrading = false, side = "", entry = 0, sl = 0, tps = [], hitTPs = [], currentSession = "";
+
+        function initBot() {
+            setInterval(updateData, 1000); // Quét giá 1s
+            setInterval(checkTele, 1500); // Check lệnh Telegram
+            updateData();
+        }
+
+        function getSession() {
+            const hour = new Date().getUTCHours() + 7; // Giờ VN
+            const h = hour >= 24 ? hour - 24 : hour;
+            if (h >= 6 && h < 14) return "Á (SÁNG)";
+            if (h >= 14 && h < 19) return "ÂU (CHIỀU)";
+            return "MỸ (TỐI)";
+        }
+
+        async function updateData() {
+            try {
+                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=30`);
+                const d = await r.json();
+                const prices = d.map(x => parseFloat(x[4]));
+                const volumes = d.map(x => parseFloat(x[5]));
+                
+                basePrice = prices[prices.length - 1];
+                let currentPrice = (basePrice + priceOffset);
+                document.getElementById('goldPrice').innerText = currentPrice.toFixed(2);
+                
+                currentSession = getSession();
+                document.getElementById('sessionVal').innerText = "🕒 PHIÊN " + currentSession;
+
+                // Tính Volume Thanh khoản
+                let avgVol = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+                let curVol = volumes[volumes.length - 1];
+                let volPower = Math.min((curVol / avgVol) * 50, 100);
+                document.getElementById('volPercent').innerText = volPower.toFixed(0) + "%";
+                document.getElementById('volFill').style.width = volPower + "%";
+
+                if (Math.floor(Date.now() / 1000) % 10 === 0) {
+                    const rsi = calcRSI(prices);
+                    const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+                    
+                    // Xác định xu hướng mạnh hay sideway
+                    const diff = ((basePrice - avgPrice) / avgPrice) * 100;
+                    if (Math.abs(diff) < 0.05) marketTrend = "SIDEWAY";
+                    else marketTrend = diff > 0 ? "UP TREND" : "DOWN TREND";
+                    
+                    document.getElementById('rsiVal').innerText = rsi.toFixed(2);
+                    document.getElementById('trendVal').innerText = marketTrend;
+                    document.getElementById('trendVal').style.color = marketTrend === "SIDEWAY" ? var(--gold) : (marketTrend === "UP TREND" ? "#00f0b5" : "#ff3b30");
+
+                    if (!isTrading) {
+                        const scan = document.getElementById('scanStatus');
+                        if (volPower < 25) {
+                            scan.innerText = "😴 THANH KHOẢN YẾU - CHỜ SÓNG...";
+                        } else {
+                            scan.innerText = "🔍 ĐANG QUÉT ENTRY ĐẸP...";
+                            // Chiến thuật Dynamic RSI theo Trend
+                            if (marketTrend === "UP TREND" && rsi < 38) execute("BUY", currentPrice);
+                            else if (marketTrend === "DOWN TREND" && rsi > 62) execute("SELL", currentPrice);
+                            else if (marketTrend === "SIDEWAY") {
+                                if (rsi < 30) execute("BUY", currentPrice);
+                                if (rsi > 70) execute("SELL", currentPrice);
+                            }
+                        }
+                    }
+                }
+                if (isTrading) monitor(currentPrice);
+            } catch (e) {}
+        }
+
+        function execute(type, p) {
+            side = type; entry = p; isTrading = true; hitTPs = [];
+            
+            // Dynamic TP: Trend ăn xa, Sideway ăn ngắn
+            let gap = (marketTrend === "SIDEWAY") ? 2.5 : 5.5;
             let entryStart = p;
             let entryEnd = (type === "BUY") ? p + 5 : p - 5;
             
-            // 3. TÍNH SL (Trend nới rộng SL hơn để tránh quét)
-            sl = (type === "BUY") ? entry - (marketTrend !== "SIDEWAY" ? 20 : 12) : entry + (marketTrend !== "SIDEWAY" ? 20 : 12);
-            
-            // 4. TẠO DANH SÁCH 6 MỨC TP ĐỘNG
+            sl = (type === "BUY") ? entry - (marketTrend === "SIDEWAY" ? 12 : 20) : entry + (marketTrend === "SIDEWAY" ? 12 : 20);
             tps = Array.from({length:6}, (_,i) => parseFloat((type==="BUY" ? entry+(i+1)*gap : entry-(i+1)*gap).toFixed(2)));
             
-            // Cập nhật giao diện
             document.getElementById('tradeUI').style.display = "block";
-            document.getElementById('sideVal').innerText = type + (marketTrend !== "SIDEWAY" ? " (TREND)" : " (SIDE)");
-            document.getElementById('enVal').innerText = type === "BUY" 
-                ? `${entryStart.toFixed(2)} - ${entryEnd.toFixed(2)}` 
-                : `${entryEnd.toFixed(2)} - ${entryStart.toFixed(2)}`;
-
-            // Gửi tin nhắn Telegram
-            let msg = `🚀 **BINGX: ${type} ${marketTrend !== "SIDEWAY" ? "🔥 TREND" : "💤 SIDEWAY"}**\n`;
-            msg += `📍 Vùng Entry: **${entryStart.toFixed(2)} - ${entryEnd.toFixed(2)}**\n`;
-            msg += `🛑 Stop Loss: ${sl.toFixed(2)}\n`;
-            msg += `🎯 Mục tiêu (Gap ${gap}): ${tps[0]} -> ${tps[5]}\n`;
-            msg += `📊 Trạng thái: ${marketTrend === "UP" ? "Tăng mạnh" : "Giảm mạnh"}`;
+            document.getElementById('zoneTag').innerText = `🚀 ${type} ${marketTrend}`;
+            document.getElementById('enVal').innerText = type === "BUY" ? `${entryStart.toFixed(2)} - ${entryEnd.toFixed(2)}` : `${entryEnd.toFixed(2)} - ${entryStart.toFixed(2)}`;
+            document.getElementById('slVal').innerText = sl.toFixed(2);
+            document.getElementById('tpGrid').innerHTML = tps.map((v,i) => `<div class="tp-box" id="tp-${i}">TP${i+1}: ${v}</div>`).join('');
             
-            sendTele(msg);
+            sendTele(`🚀 **BINGX: ${type} ZONE** [${currentSession}]\n📊 Xu hướng: ${marketTrend}\n📍 Entry: ${entryStart.toFixed(2)} - ${entryEnd.toFixed(2)}\n🛑 SL: ${sl.toFixed(2)}\n🎯 TP (Gap ${gap}): ${tps[0]} -> ${tps[5]}`);
         }
+
+        function monitor(p) {
+            if ((side === "BUY" && p <= sl) || (side === "SELL" && p >= sl)) {
+                sendTele(`❌ BINGX: Đã dính SL/Đóng lệnh @ ${p.toFixed(2)}`);
+                isTrading = false; document.getElementById('tradeUI').style.display = "none";
+                return;
+            }
+            tps.forEach((target, i) => {
+                if (!hitTPs.includes(i) && ((side === "BUY" && p >= target) || (side === "SELL" && p <= target))) {
+                    hitTPs.push(i); document.getElementById(`tp-${i}`).classList.add('hit');
+                    sendTele(`✅ BINGX: CHẠM TP${i+1} (${target})`);
+                }
+            });
+        }
+
+        async function checkTele() {
+            try {
+                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId+1}&timeout=1`);
+                const d = await r.json();
+                if (d.result) for (let u of d.result) {
+                    lastUpdateId = u.update_id;
+                    if (!u.message || !u.message.text) continue;
+                    const m = u.message.text.trim().toLowerCase();
+                    if (m === "/start" || m === "/ping") {
+                        sendTele(`✅ BINGX V16.0 LIVE\n🌍 Phiên: ${currentSession}\n💰 Giá: ${document.getElementById('goldPrice').innerText}\n📊 Trend: ${marketTrend}\n💧 Vol: ${document.getElementById('volPercent').innerText}`);
+                    }
+                    if (m.startsWith("/sync")) {
+                        let val = parseFloat(m.replace("/sync","").trim());
+                        if(!isNaN(val)) { priceOffset = val - basePrice; sendTele("🎯 Đã đồng bộ giá BingX!"); }
+                    }
+                    if (m === "/done") { isTrading = false; document.getElementById('tradeUI').style.display="none"; sendTele("✅ Reset trạng thái bot."); }
+                }
+            } catch (e) {}
+        }
+
+        function calcRSI(p) {
+            let g = 0, l = 0;
+            for (let i = p.length - 14; i < p.length; i++) {
+                let d = p[i] - p[i-1];
+                if (d >= 0) g += d; else l -= d;
+            }
+            return 100 - (100 / (1 + (g / l)));
+        }
+
+        function sendTele(msg) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`); }
+    </script>
+</body>
+</html>
