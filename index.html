@@ -1,1 +1,153 @@
 
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOLD V14.0 - STABLE PRO</title>
+    <style>
+        :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
+        body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
+        .card { border: 2px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 400px; margin: 10px auto; }
+        .price { font-size: 40px; font-weight: bold; color: var(--gold); margin: 5px 0; }
+        .stats-row { display: flex; justify-content: space-around; font-size: 12px; color: #848e9c; margin-bottom: 10px; }
+        .tp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px; }
+        .tp-box { background: #2b3139; padding: 5px; font-size: 11px; border-radius: 4px; border-left: 3px solid var(--green); text-align: left; }
+        .hit { background: var(--green) !important; color: black !important; font-weight: bold; }
+        .hmr-alert { background: rgba(255, 215, 0, 0.1); border: 1px solid var(--gold); padding: 5px; border-radius: 5px; font-size: 11px; margin-bottom: 10px; color: var(--gold); }
+    </style>
+</head>
+<body onload="initBot()">
+    <div class="card">
+        <div class="hmr-alert">V14.0 STABLE - SYSTEM ONLINE</div>
+        <div id="botStatus" style="font-size: 10px; color: var(--green);">CONNECTED</div>
+        <div id="goldPrice" class="price">0.00</div>
+        
+        <div class="stats-row">
+            <div>RSI: <b id="rsiVal">--</b></div>
+            <div>Sóng: <b id="volVal">--</b></div>
+            <div>Mode: <b id="modeVal">SIDEWAY</b></div>
+        </div>
+
+        <div id="tradeUI" style="display:none; border-top: 1px solid #333; padding-top: 10px;">
+            <div style="font-weight:bold; color:var(--gold)"><span id="sideVal">--</span> @ <span id="enVal">--</span></div>
+            <div style="color:var(--red); font-size:12px; margin-bottom: 5px;">SL: <b id="slVal">--</b></div>
+            <div class="tp-grid" id="tpGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
+        const CHAT_ID = "7994694689";
+
+        let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
+        let isTrading = false, side = "", entry = 0, sl = 0, tps = [], hitTPs = [];
+        let mode = "sideway", lastRSI = 50;
+
+        function initBot() {
+            setInterval(updateData, 3000);
+            setInterval(checkTele, 2000);
+        }
+
+        async function updateData() {
+            try {
+                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50`);
+                const d = await r.json();
+                const prices = d.map(x => parseFloat(x[4]));
+                basePrice = prices[prices.length - 1];
+                
+                const rsi = calcRSI(prices);
+                const vol = Math.max(...prices.slice(-10)) - Math.min(...prices.slice(-10));
+                const price = parseFloat((basePrice + priceOffset).toFixed(2));
+
+                document.getElementById('goldPrice').innerText = price.toFixed(2);
+                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
+                document.getElementById('volVal').innerText = vol.toFixed(1);
+
+                if (!isTrading) {
+                    let bL = (mode === "sideway") ? 30 : 42;
+                    let sL = (mode === "sideway") ? 70 : 58;
+                    if (rsi < bL) execute("BUY", price, vol);
+                    else if (rsi > sL) execute("SELL", price, vol);
+                } else {
+                    monitor(price, rsi);
+                }
+                lastRSI = rsi;
+            } catch (e) { }
+        }
+
+        function execute(type, p, v) {
+            side = type; entry = p; isTrading = true; hitTPs = [];
+            let gap = v > 6 ? 3.5 : 2.0;
+            sl = type === "BUY" ? entry - (gap * 3) : entry + (gap * 3);
+            tps = [];
+            for(let i=1; i<=6; i++) {
+                let m = i <= 3 ? i : 3 + (i-3)*2;
+                tps.push(parseFloat((type === "BUY" ? entry + (gap*m) : entry - (gap*m)).toFixed(2)));
+            }
+            showUI();
+            sendTele(`🚀 LỆNH ${type}\n📍 Entry: ${entry}\n🛑 SL: ${sl.toFixed(2)}\n🎯 TP1: ${tps[0]} -> TP6: ${tps[5]}`);
+        }
+
+        function monitor(p, rsi) {
+            if ((side === "BUY" && p <= sl) || (side === "SELL" && p >= sl)) {
+                sendTele(`❌ ĐÃ ĐÓNG (SL/Entry) tại ${p}`);
+                isTrading = false;
+                document.getElementById('tradeUI').style.display = "none";
+                return;
+            }
+            tps.forEach((target, i) => {
+                if (!hitTPs.includes(i)) {
+                    let hit = (side === "BUY" && p >= target) || (side === "SELL" && p <= target);
+                    if (hit) {
+                        hitTPs.push(i);
+                        document.getElementById(`tp-${i}`).classList.add('hit');
+                        sendTele(`✅ CHẠM TP${i+1}: ${target}`);
+                    }
+                }
+            });
+            if (hitTPs.length >= 2) {
+                let rev = (side === "BUY" && (lastRSI - rsi) > 7) || (side === "SELL" && (rsi - lastRSI) > 7);
+                if (rev) sendTele(`⚠️ SÓNG YẾU! Nên đóng lệnh tại ${p} bảo vệ lãi.`);
+            }
+        }
+
+        function calcRSI(p) {
+            let g = 0, l = 0;
+            for (let i = p.length - 14; i < p.length; i++) {
+                let d = p[i] - p[i-1];
+                if (d >= 0) g += d; else l -= d;
+            }
+            return 100 - (100 / (1 + (g / l)));
+        }
+
+        function showUI() {
+            document.getElementById('tradeUI').style.display = "block";
+            document.getElementById('sideVal').innerText = side;
+            document.getElementById('enVal').innerText = entry;
+            document.getElementById('slVal').innerText = sl.toFixed(2);
+            document.getElementById('tpGrid').innerHTML = tps.map((v, i) => `<div class="tp-box" id="tp-${i}">TP${i+1}: ${v}</div>`).join('');
+        }
+
+        async function checkTele() {
+            try {
+                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
+                const d = await r.json();
+                if (!d.result) return;
+                for (let u of d.result) {
+                    lastUpdateId = u.update_id;
+                    const m = u.message.text.trim().toLowerCase();
+                    if (m === "/slentry") { sl = entry; sendTele("🛡️ Đã dời SL về Entry."); }
+                    if (m === "/trend") { mode = "trend"; document.getElementById('modeVal').innerText = "TREND"; sendTele("📉 Mode: TREND"); }
+                    if (m === "/sideway") { mode = "sideway"; document.getElementById('modeVal').innerText = "SIDEWAY"; sendTele("↔️ Mode: SIDEWAY"); }
+                    if (m === "/done") { isTrading = false; document.getElementById('tradeUI').style.display = "none"; sendTele("✅ Đã xóa lệnh."); }
+                    if (m.startsWith("/sync")) { priceOffset = parseFloat(m.split(" ")[1]) - basePrice; sendTele("🎯 Đã Sync."); }
+                }
+            } catch (e) {}
+        }
+
+        function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}`); }
+    </script>
+</body>
+</html>
