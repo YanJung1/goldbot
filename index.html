@@ -1,148 +1,38 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD V15.0 - TREND GUARDIAN</title>
-    <style>
-        :root { --bingx: #0052ff; --bg: #0b0e11; --card: #1e2329; --green: #00f0b5; --red: #ff3b30; --gold: #ffd700; --text: #848e9c; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; margin: 0; }
-        .card { border: 1px solid #333; border-top: 4px solid var(--gold); border-radius: 12px; padding: 15px; background: var(--card); max-width: 400px; margin: 10px auto; }
-        .price { font-size: 48px; font-weight: 800; color: white; margin: 5px 0; font-variant-numeric: tabular-nums; }
-        .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
-        .macro-item { background: #2b3139; padding: 8px; border-radius: 8px; font-size: 12px; border: 1px solid #383f47; }
-        .trend-tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
-        .trend-up { background: rgba(0, 240, 181, 0.2); color: var(--green); border: 1px solid var(--green); }
-        .trend-down { background: rgba(255, 59, 48, 0.2); color: var(--red); border: 1px solid var(--red); }
-        .status-msg { font-size: 12px; padding: 8px; border-radius: 6px; margin-top: 10px; background: rgba(255, 215, 0, 0.05); color: var(--gold); border: 1px solid rgba(255, 215, 0, 0.3); }
-        .tp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        .tp-box { background: #2b3139; padding: 8px; font-size: 11px; border-radius: 6px; border-left: 3px solid var(--green); text-align: left; }
-        .hit { background: var(--green) !important; color: #000 !important; font-weight: bold; }
-    </style>
-</head>
-<body onload="initBot()">
-    <div class="card">
-        <div id="trendDisplay" class="trend-tag trend-up">Đang xác định xu hướng...</div>
-        <div id="goldPrice" class="price">0.00</div>
-        
-        <div class="macro-grid">
-            <div class="macro-item"><span style="color:var(--text)">💵 DXY:</span> <b id="dxyVal" style="color:var(--gold)">--</b></div>
-            <div class="macro-item"><span style="color:var(--text)">📈 RSI:</span> <b id="rsiVal">--</b></div>
-        </div>
-        
-        <div id="scanStatus" class="status-msg">🔍 ĐANG LỌC TREND...</div>
-
-        <div id="tradeUI" style="display:none; border-top: 1px solid #333; margin-top: 15px; padding-top: 15px;">
-            <div style="font-size: 18px; font-weight: bold; color: var(--gold);">📍 <span id="sideVal">--</span> @ <span id="enVal">--</span></div>
-            <div style="color: var(--text); font-size: 12px; margin-bottom: 10px;">🛡️ TREND PROTECTED MODE</div>
-            <div class="tp-grid" id="tpGrid"></div>
-        </div>
-    </div>
-
-    <script>
-        const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
-        const CHAT_ID = "7994694689";
-
-        let lastUpdateId = 0, priceOffset = 0, basePrice = 0, marketTrend = "sideway";
-        let isTrading = false, side = "", entry = 0, sl = 0, tps = [], hitTPs = [];
-
-        function initBot() {
-            setInterval(updateData, 1000);
-            setInterval(checkTele, 1500);
-            updateData();
-        }
-
-        async function updateData() {
+async function checkTele() {
             try {
-                const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50`);
+                // Thêm tham số timeout để bot phản hồi nhanh hơn
+                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
                 const d = await r.json();
-                const prices = d.map(x => parseFloat(x[4]));
-                basePrice = prices[prices.length - 1];
                 
-                // 1. TÍNH TREND (EMA 20)
-                const ema = prices.reduce((a, b) => a + b, 0) / prices.length;
-                marketTrend = basePrice > ema ? "up" : "down";
-                updateTrendUI(marketTrend);
+                if (d.result && d.result.length > 0) {
+                    for (let u of d.result) {
+                        // Cập nhật ID tin nhắn ngay lập tức để tránh trùng lặp
+                        lastUpdateId = u.update_id;
+                        
+                        if (!u.message || !u.message.text) continue;
+                        const m = u.message.text.trim().toLowerCase();
+                        
+                        console.log("Nhận lệnh:", m); // Kiểm tra trong Console của trình duyệt
 
-                // 2. TÍNH RSI & DXY XẤP XỈ
-                const rsi = calcRSI(prices);
-                const dxy = (50.143 * Math.pow(prices[0]/prices[49], -0.1)).toFixed(3); // Logic tương quan đơn giản
-                
-                document.getElementById('goldPrice').innerText = (basePrice + priceOffset).toFixed(2);
-                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                document.getElementById('dxyVal').innerText = dxy;
-
-                // 3. LOGIC ĐÁNH THEO TREND (BỎ QUA NGHỊCH TREND)
-                if (!isTrading) {
-                    const statusEl = document.getElementById('scanStatus');
-                    
-                    if (marketTrend === "up") {
-                        statusEl.innerText = "📈 TREND TĂNG: Chỉ tìm điểm BUY...";
-                        if (rsi < 35) execute("BUY", (basePrice + priceOffset)); // Chỉ Buy khi giá hồi
-                    } else {
-                        statusEl.innerText = "📉 TREND GIẢM: Chỉ tìm điểm SELL...";
-                        if (rsi > 65) execute("SELL", (basePrice + priceOffset)); // Chỉ Sell khi giá hồi
+                        if (m === "/start" || m === "/ping") {
+                            const p = document.getElementById('goldPrice').innerText;
+                            const rsi = document.getElementById('rsiVal').innerText;
+                            const tr = marketTrend === "up" ? "TĂNG 📈" : "GIẢM 📉";
+                            
+                            sendTele(`✅ BINGX V15.1 ONLINE\n💰 Giá: ${p}\n📈 RSI: ${rsi}\n📊 Trend: ${tr}\n🛡️ Trạng thái: ${isTrading ? "ĐANG CÓ LỆNH" : "ĐANG QUÉT"}`);
+                            continue;
+                        }
+                        
+                        // Các lệnh khác giữ nguyên...
+                        if (m.startsWith("/sync")) {
+                             let val = parseFloat(m.replace("/sync","").trim());
+                             if(!isNaN(val)) {
+                                 priceOffset = val - basePrice;
+                                 sendTele(`🎯 Đã Sync giá BingX: ${val}`);
+                             }
+                        }
+                        if (m === "/done") { isTrading = false; document.getElementById('tradeUI').style.display="none"; sendTele("✅ Đã reset trạng thái."); }
                     }
-                } else {
-                    monitor((basePrice + priceOffset));
                 }
-            } catch (e) {}
+            } catch (e) { console.error("Lỗi Telegram:", e); }
         }
-
-        function updateTrendUI(t) {
-            const el = document.getElementById('trendDisplay');
-            el.className = "trend-tag " + (t === "up" ? "trend-up" : "trend-down");
-            el.innerText = t === "up" ? "📊 Xu hướng: TĂNG (Ưu tiên BUY)" : "📊 Xu hướng: GIẢM (Ưu tiên SELL)";
-        }
-
-        function execute(type, p) {
-            side = type; entry = p; isTrading = true; hitTPs = [];
-            let gap = 3.5; sl = type === "BUY" ? entry - 15 : entry + 15;
-            tps = Array.from({length:6}, (_,i) => parseFloat((type==="BUY" ? entry+(i+1)*gap : entry-(i+1)*gap).toFixed(2)));
-            document.getElementById('tradeUI').style.display = "block";
-            document.getElementById('sideVal').innerText = side;
-            document.getElementById('enVal').innerText = entry.toFixed(2);
-            document.getElementById('tpGrid').innerHTML = tps.map((v,i) => `<div class="tp-box" id="tp-${i}">TP${i+1}: ${v}</div>`).join('');
-            sendTele(`🛡️ LỆNH THEO TREND: ${type}\n📍 Entry: ${entry.toFixed(2)}\n🛑 SL: ${sl.toFixed(2)}\n💎 Bảo vệ trend: BẬT`);
-        }
-
-        function monitor(p) {
-            if ((side === "BUY" && p <= sl) || (side === "SELL" && p >= sl)) {
-                sendTele(`❌ Đã đóng lệnh @ ${p.toFixed(2)}`);
-                isTrading = false; document.getElementById('tradeUI').style.display = "none";
-                return;
-            }
-            tps.forEach((target, i) => {
-                if (!hitTPs.includes(i) && ((side === "BUY" && p >= target) || (side === "SELL" && p <= target))) {
-                    hitTPs.push(i); document.getElementById(`tp-${i}`).classList.add('hit');
-                    sendTele(`✅ CHẠM TP${i+1}: ${target}`);
-                }
-            });
-        }
-
-        async function checkTele() {
-            try {
-                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId+1}&timeout=1`);
-                const d = await r.json();
-                if (d.result) for (let u of d.result) {
-                    lastUpdateId = u.update_id;
-                    const m = u.message.text.trim().toLowerCase();
-                    if (m.startsWith("/sync")) { priceOffset = parseFloat(m.replace("/sync","")) - basePrice; sendTele("🎯 Đã khớp BingX!"); }
-                    if (m === "/done") { isTrading = false; document.getElementById('tradeUI').style.display="none"; }
-                }
-            } catch (e) {}
-        }
-
-        function calcRSI(p) {
-            let g = 0, l = 0;
-            for (let i = p.length - 14; i < p.length; i++) {
-                let d = p[i] - p[i-1];
-                if (d >= 0) g += d; else l -= d;
-            }
-            return 100 - (100 / (1 + (g / l)));
-        }
-
-        function sendTele(msg) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`); }
-    </script>
-</body>
-</html>
