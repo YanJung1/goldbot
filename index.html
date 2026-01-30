@@ -3,32 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD BINGX V18.0 - ULTIMATE</title>
+    <title>GOLD BINGX V21.0 - VISUAL STRATEGIST</title>
     <style>
         :root { --bingx: #0052ff; --bg: #0b0e11; --card: #1e2329; --green: #00f0b5; --red: #ff3b30; --gold: #ffd700; }
-        body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
-        .card { border: 1px solid #333; border-top: 4px solid var(--gold); border-radius: 12px; padding: 20px; background: var(--card); max-width: 400px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .price { font-size: 55px; font-weight: bold; margin: 5px 0; letter-spacing: -2px; }
-        .mode-tag { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 10px; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; margin: 0; }
+        .card { border: 1px solid #333; border-top: 5px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 420px; margin: 10px auto; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+        .price { font-size: 55px; font-weight: bold; margin: 10px 0; color: white; }
+        .mode-tag { display: inline-block; padding: 6px 15px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; }
         .mode-sideway { background: rgba(255, 215, 0, 0.2); color: var(--gold); border: 1px solid var(--gold); }
         .mode-trend { background: rgba(0, 240, 181, 0.2); color: var(--green); border: 1px solid var(--green); }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .info-box { background: #2b3139; padding: 10px; border-radius: 8px; border: 1px solid #383f47; font-size: 12px; }
-        .status { font-size: 13px; color: #848e9c; padding: 10px; }
+        .info-box { background: #2b3139; padding: 10px; border-radius: 8px; border: 1px solid #383f47; }
+        .info-box span { display: block; font-size: 10px; color: #848e9c; text-transform: uppercase; }
+        .trend-box { margin-top: 15px; padding: 10px; background: #161a1e; border-radius: 8px; font-size: 12px; border: 1px dashed #444; }
+        .status { font-size: 11px; color: #848e9c; margin-top: 15px; }
     </style>
 </head>
 <body onload="initBot()">
     <div class="card">
-        <div id="modeTag" class="mode-tag mode-sideway">ĐANG PHÂN TÍCH...</div>
+        <div id="modeTag" class="mode-tag mode-sideway">ĐANG ĐỒNG BỘ...</div>
         <div id="goldPrice" class="price">0.00</div>
         
         <div class="info-grid">
-            <div class="info-box">RSI (15m): <br><b id="rsiVal" style="font-size:18px">--</b></div>
-            <div class="info-box">LỰC VOL: <br><b id="volPower" style="font-size:18px">--</b></div>
-            <div class="info-box" style="grid-column: span 2;">TRẠNG THÁI: <b id="marketState">--</b></div>
+            <div class="info-box"><span>RSI (15m)</span><b id="rsiVal">--</b></div>
+            <div class="info-box"><span>Lực Vol</span><b id="volPower">--</b></div>
+        </div>
+
+        <div class="trend-box">
+            <span style="color: #848e9c; font-size: 10px;">XU HƯỚNG ĐA KHUNG</span><br>
+            <div id="multiTrend">H1: -- | H4: -- | D1: --</div>
         </div>
         
-        <div id="scanStatus" class="status">🛰️ ĐANG KẾT NỐI VỆ TINH TIN TỨC...</div>
+        <div id="marketState" style="margin-top:15px; font-weight:bold; color:var(--gold)">Đang quét mô hình nến...</div>
+        <div id="scanStatus" class="status">🛰️ Vệ tinh Trump & War đang hoạt động...</div>
     </div>
 
     <script>
@@ -36,92 +43,127 @@
         const CHAT_ID = "7994694689";
 
         let lastUpdateId = 0, priceOffset = 0, basePrice = 0, isTrading = false;
-        let lastBreakingNews = "", lastNewsId = "";
+        let lastBreakingNews = "", lastNewsId = "", h1Trend = "--", h4Trend = "--", d1Trend = "--";
 
         function initBot() {
             updateData(); 
-            setInterval(updateData, 2000); // Quét giá & kỹ thuật
-            setInterval(checkTele, 1500); // Check lệnh Tele
-            setInterval(scanBreakingNews, 30000); // Quét tin Trump/Chiến tranh
-            setInterval(fetchEconomicNews, 600000); // Quét tin đỏ ForexFactory
-            setInterval(dailyPlan, 60000); // Check gửi Plan sáng
+            setInterval(updateData, 2000); 
+            setInterval(checkTeleCommands, 1500); 
+            setInterval(scanWorldNews, 30000); 
+            setInterval(fetchForexFactory, 600000); 
+            setInterval(sendDailyPlan, 60000);
         }
 
         async function updateData() {
             try {
+                // Lấy dữ liệu 15m
                 const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50`);
                 const d = await r.json();
                 const prices = d.map(x => parseFloat(x[4]));
                 const volumes = d.map(x => parseFloat(x[5]));
                 
                 basePrice = prices[prices.length - 1];
-                const currentPrice = (basePrice + priceOffset);
-                document.getElementById('goldPrice').innerText = currentPrice.toFixed(2);
+                document.getElementById('goldPrice').innerText = (basePrice + priceOffset).toFixed(2);
 
+                // Tính toán kỹ thuật
                 const rsi = calcRSI(prices);
-                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                
                 const avgVol = volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
-                const currentVol = volumes[volumes.length - 1];
-                const volRatio = currentVol / avgVol;
+                const volRatio = volumes[volumes.length - 1] / avgVol;
+                const ema20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+
+                // Cập nhật giao diện
+                document.getElementById('rsiVal').innerText = rsi.toFixed(2);
                 document.getElementById('volPower').innerText = volRatio.toFixed(1) + "x";
 
-                const ema20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
-                const closePrice = prices[prices.length - 1];
-                const prevClose = prices[prices.length - 2];
+                // Phân tích đa khung (H1, H4, D1)
+                await updateMultiTrends();
+                document.getElementById('multiTrend').innerText = `H1: ${h1Trend} | H4: ${h4Trend} | D1: ${d1Trend}`;
 
-                // PHÂN LOẠI THỊ TRƯỜNG
-                let marketState = (volRatio > 1.3) ? "TRENDING" : "SIDEWAY";
-                const modeTag = document.getElementById('modeTag');
-                modeTag.innerText = marketState === "TRENDING" ? "🔥 CHẾ ĐỘ TREND" : "💤 CHẾ ĐỘ SIDEWAY";
-                modeTag.className = `mode-tag ${marketState === "TRENDING" ? 'mode-trend' : 'mode-sideway'}`;
+                // Nhận diện nến
+                const candlePattern = recognizePattern(d[d.length-1], d[d.length-2]);
+                document.getElementById('marketState').innerText = candlePattern || "Thị trường ổn định";
+
+                // Logic báo lệnh
+                const isVolConfirm = (volRatio > 1.5);
+                const isNewsActive = (lastBreakingNews !== "" || lastNewsId !== "");
 
                 if (!isTrading) {
-                    // 1. CHIẾN THUẬT TREND (BREAKOUT)
-                    if (marketState === "TRENDING") {
-                        if (closePrice > (ema20 + 0.3) && prevClose <= ema20 && rsi > 50) {
-                            execute("BUY", currentPrice, "BREAKOUT TĂNG + VOL LỚN", 15, 6);
-                        } else if (closePrice < (ema20 - 0.3) && prevClose >= ema20 && rsi < 50) {
-                            execute("SELL", currentPrice, "BREAKOUT GIẢM + VOL LỚN", 15, 6);
-                        }
-                    } 
-                    // 2. CHIẾN THUẬT SIDEWAY (LƯỚT SÓNG RSI)
-                    else {
-                        if (rsi < 28) {
-                            execute("BUY", currentPrice, "SIDEWAY: QUÁ BÁN (LƯỚT)", 10, 3);
-                        } else if (rsi > 72) {
-                            execute("SELL", currentPrice, "SIDEWAY: QUÁ MUA (LƯỚT)", 10, 3);
-                        }
+                    if (isVolConfirm || isNewsActive) { // CHẾ ĐỘ BIẾN ĐỘNG
+                        document.getElementById('modeTag').innerText = "🔥 TREND JACKPOT";
+                        document.getElementById('modeTag').className = "mode-tag mode-trend";
+                        if (basePrice > ema20 + 0.5) execute("BUY", "TREND/NEWS", 25, [40, 70, 100], candlePattern);
+                        else if (basePrice < ema20 - 0.5) execute("SELL", "TREND/NEWS", 25, [40, 70, 100], candlePattern);
+                    } else { // CHẾ ĐỘ SIDEWAY
+                        document.getElementById('modeTag').innerText = "💤 SIDEWAY";
+                        document.getElementById('modeTag').className = "mode-tag mode-sideway";
+                        if (rsi < 25) execute("BUY", "SIDEWAY (RSI)", 15, [15, 22, 30], candlePattern);
+                        else if (rsi > 75) execute("SELL", "SIDEWAY (RSI)", 15, [15, 22, 30], candlePattern);
                     }
                 }
+            } catch (e) { console.log("Lỗi tải dữ liệu"); }
+        }
+
+        async function updateMultiTrends() {
+            try {
+                const intervals = ['1h', '4h', '1d'];
+                const results = await Promise.all(intervals.map(i => fetch(`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=${i}&limit=20`).then(r => r.json())));
+                h1Trend = getEmaTrend(results[0]);
+                h4Trend = getEmaTrend(results[1]);
+                d1Trend = getEmaTrend(results[2]);
             } catch (e) {}
         }
 
-        function execute(type, p, reason, slPips, tpGap) {
-            isTrading = true;
-            let sl = (type === "BUY") ? p - slPips : p + slPips;
-            let tps = Array.from({length:3}, (_,i) => (type === "BUY" ? p + (i+1)*tpGap : p - (i+1)*tpGap).toFixed(2));
-            
-            sendTele(`⚔️ **TÍN HIỆU VÀNG BINGX**\n\n🎯 Lệnh: **${type}**\n📌 Chiến thuật: ${reason}\n📍 Entry Zone: **${p.toFixed(2)} - ${(type==="BUY"?p+2:p-2).toFixed(2)}**\n🛑 SL: ${sl.toFixed(2)}\n💰 TP: ${tps.join(" -> ")}`);
+        function getEmaTrend(data) {
+            const closes = data.map(x => parseFloat(x[4]));
+            const ema = closes.reduce((a, b) => a + b, 0) / closes.length;
+            return closes[closes.length - 1] > ema ? "TĂNG ↑" : "GIẢM ↓";
         }
 
-        async function scanBreakingNews() {
+        function recognizePattern(c, p) {
+            const o = parseFloat(c[1]), h = parseFloat(c[2]), l = parseFloat(c[3]), cl = parseFloat(c[4]);
+            const po = parseFloat(p[1]), pcl = parseFloat(p[4]);
+            const body = Math.abs(o - cl), range = h - l;
+            if (cl > o && (cl - o) > Math.abs(po - pcl) * 1.5 && cl > po) return "Nhấn Chìm Tăng";
+            if (o > cl && (o - cl) > Math.abs(po - pcl) * 1.5 && cl < po) return "Nhấn Chìm Giảm";
+            if (body < range * 0.1) return "Doji (Lưỡng lự)";
+            return "";
+        }
+
+        function execute(type, mode, sl, tps, pattern) {
+            isTrading = true;
+            const p = basePrice + priceOffset;
+            const tp1 = (type === "BUY" ? p + tps[0] : p - tps[0]).toFixed(2);
+            const tp2 = (type === "BUY" ? p + tps[1] : p - tps[1]).toFixed(2);
+            const tp3 = (type === "BUY" ? p + tps[2] : p - tps[2]).toFixed(2);
+            const stopL = (type === "BUY" ? p - sl : p + sl).toFixed(2);
+            
+            let msg = `⚔️ **KÈO VÀNG BINGX V21.0**\n\n`;
+            msg += `🎯 Lệnh: **${type}**\n📌 Chiến thuật: ${mode}\n`;
+            if (pattern) msg += `🕯️ Mô hình: ${pattern}\n`;
+            msg += `📍 Entry: **${p.toFixed(2)}**\n🛑 SL: ${stopL}\n\n`;
+            msg += `💰 **MỤC TIÊU:**\n✅ TP1: ${tp1}\n🔥 TP2: ${tp2}\n🚀 TP3: ${tp3}\n\n`;
+            msg += `📊 **XU HƯỚNG:**\nH1: ${h1Trend} | H4: ${h4Trend} | D1: ${d1Trend}`;
+            
+            sendTele(msg);
+        }
+
+        async function scanWorldNews() {
             try {
                 const r = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN');
-                const data = await r.json();
-                const latestNews = data.Data[0];
-                if (latestNews && latestNews.id !== lastBreakingNews) {
-                    const title = latestNews.title.toLowerCase();
-                    const kw = ['war','missile','attack','invasion','nuclear','trump','tariff','biden','fed','powell'];
-                    if (kw.some(k => title.includes(k))) {
-                        sendTele(`🚨 **TIN NÓNG (CHIẾN TRANH/TRUMP)**\n\n📰: ${latestNews.title}\n\n⚠️ *Vàng sẽ biến động mạnh, kiểm tra ngay BingX!*`);
-                        lastBreakingNews = latestNews.id;
+                const d = await r.json();
+                const latest = d.Data[0];
+                if (latest && latest.id !== lastBreakingNews) {
+                    const txt = (latest.title + latest.body).toLowerCase();
+                    const kw = ['war','missile','trump','tariff','nuclear','attack','israel','iran'];
+                    if (kw.some(k => txt.includes(k))) {
+                        sendTele(`🚨 **TIN CHẤN ĐỘNG (WAR/TRUMP)**\n\n📰: **${latest.title}**\n\n⚠️ *Cảnh báo Vàng biến động cực mạnh!*`);
+                        lastBreakingNews = latest.id;
                     }
                 }
             } catch (e) {}
         }
 
-        async function fetchEconomicNews() {
+        async function fetchForexFactory() {
             try {
                 const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
                 const events = await r.json();
@@ -129,32 +171,32 @@
                 events.forEach(e => {
                     const eTime = new Date(e.date);
                     const diff = (eTime - now) / 60000;
-                    if (e.impact === "High" && e.country === "USD" && diff > 0 && diff <= 30 && lastNewsId !== e.title) {
-                        sendTele(`🔔 **TIN ĐỎ SẮP RA (30 PHÚT)**\n📊 Tin: ${e.title}\n⏰ Giờ: ${eTime.toLocaleTimeString('vi-VN')}`);
+                    if (e.impact === "High" && diff > 0 && diff <= 30 && lastNewsId !== e.title) {
+                        sendTele(`🔔 **TIN ĐỎ TRONG 30 PHÚT**\n📊: ${e.title}\n⏰: ${eTime.toLocaleTimeString('vi-VN')}`);
                         lastNewsId = e.title;
                     }
                 });
             } catch (e) {}
         }
 
-        function dailyPlan() {
+        function sendDailyPlan() {
             const now = new Date();
             if (now.getHours() === 6 && now.getMinutes() === 30) {
-                const p = parseFloat(document.getElementById('goldPrice').innerText);
-                let msg = `☀️ **PLAN GIAO DỊCH NGÀY MỚI**\n\n💰 Giá Pivot: ${p.toFixed(2)}\n📈 Kháng cự: ${(p+25).toFixed(2)}\n📉 Hỗ trợ: ${(p-25).toFixed(2)}\n\n💡 *Ghi chú: Ưu tiên đánh Sideway buổi sáng, Breakout buổi tối!*`;
+                const p = basePrice + priceOffset;
+                let msg = `☀️ **BẢN ĐỒ CHIẾN THUẬT SÁNG NAY**\n\n💰 Giá Pivot: ${p.toFixed(2)}\n📈 Kháng cự: ${(p+30).toFixed(2)}\n📉 Hỗ trợ: ${(p-30).toFixed(2)}\n\n📊 **XU HƯỚNG:**\nH1: ${h1Trend} | H4: ${h4Trend} | D1: ${d1Trend}\n\n🚀 *Kế hoạch: Ưu tiên quét Sideway biên độ 15-30 giá!*`;
                 sendTele(msg);
             }
         }
 
-        async function checkTele() {
+        async function checkTeleCommands() {
             try {
                 const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId+1}&timeout=1`);
                 const d = await r.json();
                 if (d.result) for (let u of d.result) {
                     lastUpdateId = u.update_id;
                     const m = u.message.text.trim().toLowerCase();
-                    if (m === "/ping") sendTele(`✅ BOT LIVE\n💰 Giá: ${document.getElementById('goldPrice').innerText}\n📊 RSI: ${document.getElementById('rsiVal').innerText}\n🛠 Mode: ${document.getElementById('modeTag').innerText}`);
-                    if (m === "/done") { isTrading = false; sendTele("✅ Đã reset, tiếp tục quét kèo!"); }
+                    if (m === "/ping") sendTele(`✅ BOT LIVE\n💰 Giá: ${(basePrice+priceOffset).toFixed(2)}\n📊 H4: ${h4Trend}`);
+                    if (m === "/done") { isTrading = false; sendTele("✅ Đã reset, tiếp tục săn Jackpot!"); }
                     if (m.startsWith("/sync")) { priceOffset = parseFloat(m.replace("/sync","")) - basePrice; sendTele("🎯 Đã khớp giá BingX!"); }
                 }
             } catch (e) {}
