@@ -1,11 +1,47 @@
-<script>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOLD V13.8 - AI PRO</title>
+    <style>
+        :root { --gold: #ffd700; --bg: #0b0e11; --card: #1e2329; --green: #00ff88; --red: #ff4d4d; }
+        body { background: var(--bg); color: white; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
+        .card { border: 2px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 420px; margin: 10px auto; }
+        .price { font-size: 45px; font-weight: bold; color: var(--gold); margin: 5px 0; }
+        .tp-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 11px; margin-top: 10px; text-align: left; }
+        .tp-item { padding: 4px; border-radius: 4px; background: #2b3139; border-left: 3px solid var(--green); }
+        .tp-hit { background: var(--green) !important; color: black !important; font-weight: bold; }
+        .status-tag { font-size: 10px; padding: 3px 8px; border-radius: 10px; background: #333; color: var(--gold); }
+    </style>
+</head>
+<body onload="initBot()">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <span id="botMode" class="status-tag">SIDEWAY</span>
+            <span id="netStatus" style="color: var(--red); font-size: 10px;">OFFLINE</span>
+        </div>
+        
+        <div id="goldPrice" class="price">0.00</div>
+        
+        <div style="font-size: 13px; color: #848e9c; margin-bottom: 10px;">
+            RSI: <b id="rsiVal">--</b> | Sóng: <b id="volVal">--</b>
+        </div>
+
+        <div id="tradeBox" style="display:none; border-top:1px solid #444; padding-top:10px;">
+            <div style="font-weight:bold; color:var(--gold)">📍 <span id="posType">--</span> @ <span id="enBox">--</span></div>
+            <div style="color:var(--red); font-size:12px;">SL: <b id="slBox">--</b></div>
+            <div class="tp-list" id="tpListUI"></div>
+        </div>
+    </div>
+
+    <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
 
         let lastUpdateId = 0, priceOffset = 0, basePrice = 0;
         let mode = "sideway", isTrading = false, side = "";
-        let entry = 0, sl = 0, tps = [], hitTPs = [];
-        let lastRSI = 50; // Lưu RSI vòng trước để so sánh lực quay đầu
+        let entry = 0, sl = 0, tps = [], hitTPs = [], lastRSI = 50;
 
         function initBot() {
             setInterval(updateData, 3000);
@@ -20,72 +56,22 @@
                 basePrice = prices[prices.length - 1];
                 
                 const rsi = calculateRSI(prices);
-                const volatility = Math.max(...prices.slice(-10)) - Math.min(...prices.slice(-10));
+                const vol = Math.max(...prices.slice(-10)) - Math.min(...prices.slice(-10));
                 const currentPrice = parseFloat((basePrice + priceOffset).toFixed(2));
 
                 document.getElementById('goldPrice').innerText = currentPrice.toFixed(2);
                 document.getElementById('rsiVal').innerText = rsi.toFixed(2);
-                document.getElementById('volVal').innerText = volatility.toFixed(1);
+                document.getElementById('volVal').innerText = vol.toFixed(1);
+                document.getElementById('netStatus').innerText = "ONLINE";
+                document.getElementById('netStatus').style.color = "var(--green)";
 
                 if (!isTrading) {
-                    checkSignals(rsi, currentPrice, volatility);
+                    checkSignals(rsi, currentPrice, vol);
                 } else {
                     monitorTrade(currentPrice, rsi);
                 }
-                lastRSI = rsi; // Cập nhật RSI cũ
-            } catch (e) {}
-        }
-
-        function monitorTrade(p, rsi) {
-            // 1. Kiểm tra Cắt lỗ / Hòa vốn
-            if ((side === "BUY" && p <= sl) || (side === "SELL" && p >= sl)) {
-                sendTele(`❌ KẾT THÚC: Giá chạm SL hoặc Entry (${p})`);
-                closeTrade();
-                return;
-            }
-
-            // 2. Kiểm tra các mốc TP
-            tps.forEach((target, index) => {
-                if (!hitTPs.includes(index)) {
-                    let hit = (side === "BUY" && p >= target) || (side === "SELL" && p <= target);
-                    if (hit) {
-                        hitTPs.push(index);
-                        document.getElementById(`tp-${index}`).classList.add('tp-hit');
-                        sendTele(`✅ CHẠM TP${index + 1}: ${target}`);
-                    }
-                }
-            });
-
-            // 3. LOGIC CẢNH BÁO ĐẢO CHIỀU (QUAN TRỌNG)
-            // Nếu đã đạt ít nhất TP2 và RSI quay đầu > 7 đơn vị
-            if (hitTPs.length >= 2) {
-                let reversal = false;
-                if (side === "BUY" && (lastRSI - rsi) > 7) reversal = true; 
-                if (side === "SELL" && (rsi - lastRSI) > 7) reversal = true;
-
-                if (reversal) {
-                    sendTele(`⚠️ CẢNH BÁO: Sóng đảo chiều mạnh tại ${p}! Không thể lên tới TP tiếp theo. NÊN ĐÓNG LỆNH NGAY.`);
-                }
-            }
-        }
-
-        function executeTrade(type, p, vol) {
-            side = type; entry = p; isTrading = true; hitTPs = [];
-            let step = vol > 6 ? 3.0 : 1.8; 
-            sl = type === "BUY" ? entry - (step * 2.5) : entry + (step * 2.5);
-            
-            tps = [];
-            for(let i=1; i<=6; i++) {
-                let gap = i <= 3 ? (i * step) : (3 * step) + ((i-3) * step * 2);
-                tps.push(parseFloat((type === "BUY" ? entry + gap : entry - gap).toFixed(2)));
-            }
-            renderTPs();
-            sendTele(`🚀 LỆNH ${type}\n📍 Entry: ${entry}\n🛑 SL: ${sl.toFixed(2)}\n🎯 TP1: ${tps[0]} -> TP6: ${tps[5]}`);
-        }
-
-        function closeTrade() {
-            isTrading = false;
-            document.getElementById('tradeBox').style.display = "none";
+                lastRSI = rsi;
+            } catch (e) { document.getElementById('netStatus').innerText = "ERROR"; }
         }
 
         function calculateRSI(p) {
@@ -97,13 +83,55 @@
             return 100 - (100 / (1 + (g / l)));
         }
 
+        function checkSignals(rsi, price, vol) {
+            let buyL = (mode === "sideway") ? 30 : 42;
+            let sellL = (mode === "sideway") ? 70 : 58;
+            if (rsi < buyL) executeTrade("BUY", price, vol);
+            else if (rsi > sellL) executeTrade("SELL", price, vol);
+        }
+
+        function executeTrade(type, p, vol) {
+            side = type; entry = p; isTrading = true; hitTPs = [];
+            let step = vol > 6 ? 3.0 : 1.8;
+            sl = type === "BUY" ? entry - (step * 3) : entry + (step * 3);
+            tps = [];
+            for(let i=1; i<=6; i++) {
+                let gap = i <= 3 ? (i * step) : (3 * step) + ((i-3) * step * 2.5);
+                tps.push(parseFloat((type === "BUY" ? entry + gap : entry - gap).toFixed(2)));
+            }
+            renderTPs();
+            sendTele(`🚀 LỆNH ${type}\n📍 Entry: ${entry}\n🛑 SL: ${sl.toFixed(2)}\n🎯 TP1: ${tps[0]} -> TP6: ${tps[5]}`);
+        }
+
+        function monitorTrade(p, rsi) {
+            if ((side === "BUY" && p <= sl) || (side === "SELL" && p >= sl)) {
+                sendTele(`❌ ĐÃ ĐÓNG (SL/Entry) @ ${p}`);
+                isTrading = false;
+                document.getElementById('tradeBox').style.display = "none";
+                return;
+            }
+            tps.forEach((target, i) => {
+                if (!hitTPs.includes(i)) {
+                    let hit = (side === "BUY" && p >= target) || (side === "SELL" && p <= target);
+                    if (hit) {
+                        hitTPs.push(i);
+                        document.getElementById(`tp-${i}`).classList.add('tp-hit');
+                        sendTele(`✅ TP${i+1} CHẠM: ${target}`);
+                    }
+                }
+            });
+            if (hitTPs.length >= 2) {
+                let rev = (side === "BUY" && (lastRSI - rsi) > 7) || (side === "SELL" && (rsi - lastRSI) > 7);
+                if (rev) sendTele(`⚠️ SÓNG ĐẢO CHIỀU! Nên đóng lệnh tại ${p} để giữ lãi.`);
+            }
+        }
+
         function renderTPs() {
-            const list = document.getElementById('tpListUI');
             document.getElementById('tradeBox').style.display = "block";
             document.getElementById('posType').innerText = side;
             document.getElementById('enBox').innerText = entry;
             document.getElementById('slBox').innerText = sl.toFixed(2);
-            list.innerHTML = tps.map((v, i) => `<div class="tp-item" id="tp-${i}">TP${i+1}: ${v}</div>`).join('');
+            document.getElementById('tpListUI').innerHTML = tps.map((v, i) => `<div class="tp-item" id="tp-${i}">TP${i+1}: ${v}</div>`).join('');
         }
 
         async function checkTele() {
@@ -115,7 +143,9 @@
                     lastUpdateId = u.update_id;
                     const m = u.message.text.trim().toLowerCase();
                     if (m === "/slentry") { sl = entry; sendTele("🛡️ Đã dời SL về Entry."); }
-                    if (m === "/done") { closeTrade(); sendTele("✅ Đã đóng lệnh tay."); }
+                    if (m === "/trend") { mode = "trend"; document.getElementById('botMode').innerText = "TREND"; sendTele("📉 Mode: TREND"); }
+                    if (m === "/sideway") { mode = "sideway"; document.getElementById('botMode').innerText = "SIDEWAY"; sendTele("↔️ Mode: SIDEWAY"); }
+                    if (m === "/done") { isTrading = false; document.getElementById('tradeBox').style.display = "none"; sendTele("✅ Đã đóng lệnh."); }
                     if (m.startsWith("/sync")) { priceOffset = parseFloat(m.split(" ")[1]) - basePrice; sendTele("🎯 Đã Sync."); }
                 }
             } catch (e) {}
@@ -124,11 +154,6 @@
         function sendTele(msg) {
             fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`);
         }
-        
-        function checkSignals(rsi, price, vol) {
-            let buyL = (mode === "sideway") ? 30 : 42;
-            let sellL = (mode === "sideway") ? 70 : 58;
-            if (rsi < buyL) executeTrade("BUY", price, vol);
-            else if (rsi > sellL) executeTrade("SELL", price, vol);
-        }
     </script>
+</body>
+</html>
