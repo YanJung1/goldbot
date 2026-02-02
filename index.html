@@ -3,52 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD MASTER V28.0 - FINAL BOSS</title>
+    <title>GOLD MASTER V28.2 - FULL FIX</title>
     <style>
         :root { --bg: #0b0e11; --card: #1e2329; --green: #00f0b5; --red: #ff3b30; --gold: #ffd700; --blue: #00d4ff; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; margin: 0; }
-        .card { border: 1px solid #333; border-top: 5px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 450px; margin: 10px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .price { font-size: 55px; font-weight: bold; margin: 10px 0; color: white; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; margin: 0; }
+        .card { border: 1px solid #333; border-top: 5px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 420px; margin: 10px auto; }
+        .price { font-size: 50px; font-weight: bold; margin: 10px 0; color: white; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 15px 0; }
         .info-box { background: #2b3139; padding: 10px; border-radius: 8px; border: 1px solid #383f47; }
-        .info-box span { display: block; font-size: 9px; color: #848e9c; text-transform: uppercase; margin-bottom: 4px; }
+        .info-box span { display: block; font-size: 9px; color: #848e9c; text-transform: uppercase; }
         .info-box b { font-size: 16px; color: var(--gold); }
         .status-bar { padding: 10px; border-radius: 8px; background: rgba(0, 212, 255, 0.1); border: 1px solid var(--blue); margin-top: 10px; font-weight: bold; font-size: 13px; }
-        .trend-box { margin-top: 15px; padding: 12px; background: #161a1e; border-radius: 10px; font-size: 13px; border: 1px dashed #444; color: #848e9c; }
     </style>
 </head>
 <body onload="initBot()">
     <div class="card">
-        <div id="modeTag" style="font-size: 12px; font-weight: bold; color: var(--blue);">HỆ THỐNG ĐÃ SẴN SÀNG</div>
+        <div id="modeTag" style="font-size: 12px; color: var(--blue); font-weight: bold;">HỆ THỐNG MASTER V28.2</div>
         <div id="goldPrice" class="price">0.00</div>
         
         <div class="info-grid">
-            <div class="info-box"><span>VOL POWER</span><b id="volPower">--</b></div>
-            <div class="info-box" style="border-color: var(--blue);"><span>ATR (VAR)</span><b id="atrVal">--</b></div>
-            <div class="info-box"><span>WAVE</span><b id="wavePower">--</b></div>
+            <div class="info-box"><span>VOL</span><b id="volPower">--</b></div>
+            <div class="info-box"><span>ATR</span><b id="atrVal">--</b></div>
+            <div class="info-box"><span>SÓNG</span><b id="wavePower">--</b></div>
         </div>
 
-        <div class="status-bar" id="marketState">Đang quét cấu trúc ZigZag...</div>
-
-        <div class="trend-box">
-            <div id="multiTrend">H1: -- | H4: -- | D1: --</div>
-            <div id="zigzagStatus" style="margin-top:5px; color: var(--green);">Cấu trúc: Đang xác định...</div>
-        </div>
-        
-        <div style="font-size: 10px; color: #555; margin-top: 15px;">V28.0 FINAL • CHỐNG VẢ SL • DỊCH TIN AUTO</div>
+        <div class="status-bar" id="marketState">Đang quét cấu trúc...</div>
+        <div id="multiTrend" style="margin-top:15px; font-size: 12px; color: #848e9c;">H1: -- | H4: -- | D1: --</div>
     </div>
 
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
 
-        let priceOffset = 0, basePrice = 0, isTrading = false;
-        let lastSlTime = 0, slCount = 0, lastNewsId = "";
-        let globalData = [];
+        let lastUpdateId = 0, priceOffset = 0, basePrice = 0, isTrading = false;
+        let lastSlTime = 0, lastNewsId = "", globalData = [];
 
         async function initBot() {
             await updateData();
-            sendDailyPlan(); // Vẽ Plan ngay khi mở bot đầu ngày
+            sendDailyPlan();
             setInterval(updateData, 2000);
             setInterval(checkTeleCommands, 1500);
             setInterval(scanNews, 30000);
@@ -65,7 +57,6 @@
                 const currentPrice = basePrice + priceOffset;
                 document.getElementById('goldPrice').innerText = currentPrice.toFixed(2);
 
-                // 1. TÍNH VOLUME & ATR
                 const avgVol = volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
                 const volRatio = (volumes[volumes.length - 1] / avgVol).toFixed(1);
                 const atr = calculateATR(globalData);
@@ -74,17 +65,15 @@
                 document.getElementById('atrVal').innerText = atr.toFixed(2);
                 document.getElementById('wavePower').innerText = (currentPrice - prices[prices.length-5]).toFixed(2);
 
-                // 2. PHÂN TÍCH ZIGZAG & CẤU TRÚC
                 const structure = analyzeStructure(globalData);
-                document.getElementById('zigzagStatus').innerText = "Cấu trúc: " + structure;
-
-                // 3. LOGIC VÀO LỆNH ADAPTIVE
-                if (!isTrading && canTrade()) {
+                if (!isTrading && (Date.now() - lastSlTime > 1800000)) {
                     checkSignal(currentPrice, volRatio, atr, structure);
+                } else if (isTrading) {
+                    document.getElementById('marketState').innerText = "🏹 ĐANG TRONG LỆNH...";
+                } else {
+                    document.getElementById('marketState').innerText = "💤 ĐANG NGHỈ NGƠI SAU SL";
                 }
-
-                updateMultiTrends();
-            } catch (e) { console.error(e); }
+            } catch (e) {}
         }
 
         function calculateATR(data) {
@@ -96,34 +85,21 @@
         }
 
         function analyzeStructure(data) {
-            const last4 = data.slice(-20);
-            const high = Math.max(...last4.map(x => x[2]));
-            const low = Math.min(...last4.map(x => x[3]));
+            const last20 = data.slice(-20);
+            const high = Math.max(...last20.map(x => x[2]));
+            const low = Math.min(...last20.map(x => x[3]));
             const current = parseFloat(data[data.length-1][4]);
-            
-            if (current > (high - (high-low)*0.2)) return "TĂNG (BULLISH)";
-            if (current < (low + (high-low)*0.2)) return "GIẢM (BEARISH)";
-            return "SIDEWAY (NÉN)";
-        }
-
-        function canTrade() {
-            if (Date.now() - lastSlTime < 30 * 60000) {
-                document.getElementById('marketState').innerText = "💤 ĐANG NGHỈ NGƠI SAU SL (30P)";
-                return false;
-            }
-            return true;
+            if (current > (high - (high-low)*0.2)) return "TĂNG";
+            if (current < (low + (high-low)*0.2)) return "GIẢM";
+            return "SIDEWAY";
         }
 
         function checkSignal(price, vol, atr, structure) {
             const pattern = detectPattern(globalData);
-            
-            // CHIẾN THUẬT TREND MẠNH (JACKPOT)
             if (vol > 1.8) {
-                if (structure.includes("TĂNG")) execute("BUY", "TREND JACKPOT 🔥", atr * 2.5, atr * 8, pattern);
-                if (structure.includes("GIẢM")) execute("SELL", "TREND JACKPOT 🔥", atr * 2.5, atr * 8, pattern);
-            } 
-            // CHIẾN THUẬT SIDEWAY (VÉT RÂU)
-            else if (structure.includes("SIDEWAY") && pattern.includes("RÚT RÂU")) {
+                if (structure === "TĂNG") execute("BUY", "TREND JACKPOT 🔥", atr * 2.5, atr * 8, pattern);
+                if (structure === "GIẢM") execute("SELL", "TREND JACKPOT 🔥", atr * 2.5, atr * 8, pattern);
+            } else if (structure === "SIDEWAY" && pattern.includes("RÚT RÂU")) {
                 if (pattern.includes("DƯỚI")) execute("BUY", "VÉT RÂU SIDEWAY 💤", atr * 1.5, atr * 3, pattern);
                 if (pattern.includes("TRÊN")) execute("SELL", "VÉT RÂU SIDEWAY 💤", atr * 1.5, atr * 3, pattern);
             }
@@ -132,13 +108,10 @@
         function detectPattern(data) {
             const c = data[data.length-1];
             const o = parseFloat(c[1]), h = parseFloat(c[2]), l = parseFloat(c[3]), cl = parseFloat(c[4]);
-            const body = Math.abs(cl - o);
-            const upper = h - Math.max(o, cl);
-            const lower = Math.min(o, cl) - l;
-            
-            if (lower > body * 2) return "RÚT RÂU DƯỚI 🚀";
-            if (upper > body * 2) return "RÚT RÂU TRÊN ❄️";
-            return "NẾN TIÊU CHUẨN";
+            const body = Math.abs(cl - o), lower = Math.min(o, cl) - l, upper = h - Math.max(o, cl);
+            if (lower > body * 1.8) return "RÚT RÂU DƯỚI 🚀";
+            if (upper > body * 1.8) return "RÚT RÂU TRÊN ❄️";
+            return "NẾN CHUẨN";
         }
 
         function execute(type, mode, sl, tp, pattern) {
@@ -147,23 +120,17 @@
             const stopLoss = (type === "BUY") ? p - sl : p + sl;
             const takeProfit = (type === "BUY") ? p + tp : p - tp;
 
-            let msg = `⚔️ **KÈO FINAL BOSS V28.0**\n\n`;
-            msg += `📌 Mode: **${mode}**\n`;
-            msg += `🎯 Lệnh: **${type}**\n🕯️ Nến: ${pattern}\n\n`;
-            msg += `📍 Entry: **${p.toFixed(2)}**\n`;
-            msg += `🛑 SL (ATR): **${stopLoss.toFixed(2)}**\n`;
-            msg += `💰 TP (Target): **${takeProfit.toFixed(2)}**\n\n`;
-            msg += `⚠️ *Lưu ý: Nếu dính SL, bot sẽ tự khóa 30 phút!*`;
+            let msg = `⚔️ **KÈO MASTER V28.2**\n\n📌 Mode: **${mode}**\n🎯 Lệnh: **${type}**\n🕯️ Nến: ${pattern}\n\n📍 Entry: **${p.toFixed(2)}**\n🛑 SL: **${stopLoss.toFixed(2)}**\n💰 TP: **${takeProfit.toFixed(2)}**`;
             
-            sendTele(msg);
+            // Gửi kèm nút bấm để tránh gõ lệnh phiền phức
+            const keyboard = { inline_keyboard: [[{ text: "✅ XONG KÈO (RESET)", callback_data: "done" }]] };
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=Markdown&reply_markup=${JSON.stringify(keyboard)}`);
         }
 
         async function sendDailyPlan() {
             const h = Math.max(...globalData.slice(-40).map(x => x[2]));
             const l = Math.min(...globalData.slice(-40).map(x => x[3]));
-            let plan = `☀️ **BẢN ĐỒ CHIẾN THUẬT SÁNG NAY**\n\n`;
-            plan += `📈 Kháng cự: **${h.toFixed(2)}**\n📉 Hỗ trợ: **${l.toFixed(2)}**\n`;
-            plan += `📝 Kịch bản: Ưu tiên bắt Rút râu tại biên. Nếu Vol > 2.0x thì đánh phá vỡ (Breakout)!`;
+            let plan = `☀️ **BẢN ĐỒ CHIẾN THUẬT SÁNG NAY**\n\n📈 Kháng cự: **${h.toFixed(2)}**\n📉 Hỗ trợ: **${l.toFixed(2)}**\n📝 Kịch bản: Đánh theo kênh giá. Phá biên + Vol lớn thì gồng Trend!`;
             sendTele(plan);
         }
 
@@ -174,35 +141,47 @@
                 const latest = d.Data[0];
                 if (latest.id !== lastNewsId) {
                     lastNewsId = latest.id;
-                    let title = latest.title.toLowerCase();
-                    let vnNews = "";
-                    if (title.includes("war") || title.includes("attack")) vnNews = "🚨 CẢNH BÁO CHIẾN TRANH: Vàng có thể bay mạnh!";
-                    if (title.includes("trump")) vnNews = "🇺🇸 TIN TRUMP: Thị trường sắp có biến động chính sách.";
-                    if (title.includes("yen carry")) vnNews = "⚠️ YEN CARRY TRADE: Áp lực tháo chạy trên toàn thị trường.";
-                    if (vnNews) sendTele(vnNews + "\n(Tin gốc: " + latest.title + ")");
+                    let t = latest.title.toLowerCase(), vn = "";
+                    if (t.includes("war") || t.includes("attack")) vn = "🚨 CHIẾN TRANH!";
+                    if (t.includes("trump")) vn = "🇺🇸 TIN TRUMP!";
+                    if (t.includes("yen carry")) vn = "⚠️ YEN CARRY TRADE!";
+                    if (t.includes("binance buys")) vn = "🔥 BINANCE BẮT ĐÁY!";
+                    if (vn) sendTele(vn + "\n📰 " + latest.title);
+                }
+            } catch (e) {}
+        }
+
+        async function checkTeleCommands() {
+            try {
+                // Sửa lỗi báo lặp: Sử dụng lastUpdateId để chỉ lấy tin mới
+                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
+                const d = await r.json();
+                if (d.result) {
+                    for (let u of d.result) {
+                        lastUpdateId = u.update_id;
+                        // Xử lý cả tin nhắn văn bản và nút bấm (callback_query)
+                        let cmd = "";
+                        if (u.message) cmd = u.message.text.toLowerCase();
+                        if (u.callback_query) cmd = u.callback_query.data;
+
+                        if (cmd === "done" || cmd === "/done") {
+                            isTrading = false;
+                            sendTele("✅ Bot đã Reset. Đang đợi kèo mới!");
+                        }
+                        if (cmd.startsWith("/sync")) {
+                            const p = parseFloat(cmd.replace("/sync",""));
+                            if (!isNaN(p)) {
+                                priceOffset = p - basePrice;
+                                sendTele(`🎯 Đã khớp giá BingX: ${p.toFixed(2)}`);
+                            }
+                        }
+                    }
                 }
             } catch (e) {}
         }
 
         function sendTele(msg) {
             fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`);
-        }
-
-        async function checkTeleCommands() {
-            try {
-                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=-1`);
-                const d = await r.json();
-                if (d.result && d.result.length > 0) {
-                    const m = d.result[0].message.text.toLowerCase();
-                    if (m === "/done") { isTrading = false; sendTele("✅ Đã reset. Sẵn sàng kèo mới!"); }
-                    if (m.startsWith("/sync")) { priceOffset = parseFloat(m.replace("/sync","")) - basePrice; sendTele("🎯 Đã khớp giá BingX!"); }
-                }
-            } catch (e) {}
-        }
-
-        function updateMultiTrends() {
-            // Giả lập check đa khung đơn giản
-            document.getElementById('multiTrend').innerText = `H1: TĂNG | H4: GIẢM | D1: TĂNG`;
         }
     </script>
 </body>
