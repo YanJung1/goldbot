@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOLD MASTER V28.2 - FULL FIX</title>
+    <title>GOLD MASTER V28.2 - SCALP PRO</title>
     <style>
         :root { --bg: #0b0e11; --card: #1e2329; --green: #00f0b5; --red: #ff3b30; --gold: #ffd700; --blue: #00d4ff; }
         body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; margin: 0; }
@@ -14,10 +14,12 @@
         .info-box span { display: block; font-size: 9px; color: #848e9c; text-transform: uppercase; }
         .info-box b { font-size: 16px; color: var(--gold); }
         .status-bar { padding: 10px; border-radius: 8px; background: rgba(0, 212, 255, 0.1); border: 1px solid var(--blue); margin-top: 10px; font-weight: bold; font-size: 13px; }
+        .wallet-info { font-size: 11px; color: var(--green); margin-bottom: 10px; }
     </style>
 </head>
 <body onload="initBot()">
     <div class="card">
+        <div class="wallet-info">💰 VỐN MỤC TIÊU: 113.00 USD | MODE: SCALPING</div>
         <div id="modeTag" style="font-size: 12px; color: var(--blue); font-weight: bold;">HỆ THỐNG MASTER V28.2</div>
         <div id="goldPrice" class="price">0.00</div>
         
@@ -28,7 +30,7 @@
         </div>
 
         <div class="status-bar" id="marketState">Đang quét cấu trúc...</div>
-        <div id="multiTrend" style="margin-top:15px; font-size: 12px; color: #848e9c;">H1: -- | H4: -- | D1: --</div>
+        <div id="multiTrend" style="margin-top:15px; font-size: 12px; color: #848e9c;">SCALP MODE: ACTIVE</div>
     </div>
 
     <script>
@@ -36,14 +38,13 @@
         const CHAT_ID = "7994694689";
 
         let lastUpdateId = 0, priceOffset = 0, basePrice = 0, isTrading = false;
-        let lastSlTime = 0, lastNewsId = "", globalData = [];
+        let globalData = [];
 
         async function initBot() {
             await updateData();
-            sendDailyPlan();
+            sendTele("🚀 **BOT V28.2 ĐÃ LÊN ĐÈN!**\nVốn: 113 USD - Sẵn sàng Scalp.");
             setInterval(updateData, 2000);
             setInterval(checkTeleCommands, 1500);
-            setInterval(scanNews, 30000);
         }
 
         async function updateData() {
@@ -66,12 +67,10 @@
                 document.getElementById('wavePower').innerText = (currentPrice - prices[prices.length-5]).toFixed(2);
 
                 const structure = analyzeStructure(globalData);
-                if (!isTrading && (Date.now() - lastSlTime > 1800000)) {
+                if (!isTrading) {
                     checkSignal(currentPrice, volRatio, atr, structure);
-                } else if (isTrading) {
-                    document.getElementById('marketState').innerText = "🏹 ĐANG TRONG LỆNH...";
                 } else {
-                    document.getElementById('marketState').innerText = "💤 ĐANG NGHỈ NGƠI SAU SL";
+                    document.getElementById('marketState').innerText = "🏹 ĐANG TRONG LỆNH...";
                 }
             } catch (e) {}
         }
@@ -97,11 +96,10 @@
         function checkSignal(price, vol, atr, structure) {
             const pattern = detectPattern(globalData);
             if (vol > 1.8) {
-                if (structure === "TĂNG") execute("BUY", "TREND JACKPOT 🔥", atr * 2.5, atr * 8, pattern);
-                if (structure === "GIẢM") execute("SELL", "TREND JACKPOT 🔥", atr * 2.5, atr * 8, pattern);
+                execute(structure === "TĂNG" ? "BUY" : "SELL", "TREND JACKPOT 🔥", atr, pattern);
             } else if (structure === "SIDEWAY" && pattern.includes("RÚT RÂU")) {
-                if (pattern.includes("DƯỚI")) execute("BUY", "VÉT RÂU SIDEWAY 💤", atr * 1.5, atr * 3, pattern);
-                if (pattern.includes("TRÊN")) execute("SELL", "VÉT RÂU SIDEWAY 💤", atr * 1.5, atr * 3, pattern);
+                if (pattern.includes("DƯỚI")) execute("BUY", "VÉT RÂU SIDEWAY 💤", atr, pattern);
+                if (pattern.includes("TRÊN")) execute("SELL", "VÉT RÂU SIDEWAY 💤", atr, pattern);
             }
         }
 
@@ -109,70 +107,47 @@
             const c = data[data.length-1];
             const o = parseFloat(c[1]), h = parseFloat(c[2]), l = parseFloat(c[3]), cl = parseFloat(c[4]);
             const body = Math.abs(cl - o), lower = Math.min(o, cl) - l, upper = h - Math.max(o, cl);
-            if (lower > body * 1.8) return "RÚT RÂU DƯỚI 🚀";
-            if (upper > body * 1.8) return "RÚT RÂU TRÊN ❄️";
+            if (lower > body * 1.5) return "RÚT RÂU DƯỚI 🚀";
+            if (upper > body * 1.5) return "RÚT RÂU TRÊN ❄️";
             return "NẾN CHUẨN";
         }
 
-        function execute(type, mode, sl, tp, pattern) {
+        function execute(type, mode, atr, pattern) {
             isTrading = true;
             const p = basePrice + priceOffset;
-            const stopLoss = (type === "BUY") ? p - sl : p + sl;
-            const takeProfit = (type === "BUY") ? p + tp : p - tp;
+            const entry2 = (type === "BUY") ? p - (atr*0.3) : p + (atr*0.3);
+            const sl = (type === "BUY") ? p - (atr*2) : p + (atr*2);
+            const tp = (type === "BUY") ? p + (atr*6) : p - (atr*6);
 
-            let msg = `⚔️ **KÈO MASTER V28.2**\n\n📌 Mode: **${mode}**\n🎯 Lệnh: **${type}**\n🕯️ Nến: ${pattern}\n\n📍 Entry: **${p.toFixed(2)}**\n🛑 SL: **${stopLoss.toFixed(2)}**\n💰 TP: **${takeProfit.toFixed(2)}**`;
+            let msg = `⚔️ **KÈO SCALP MASTER**\n\n📌 Mode: **${mode}**\n🎯 Lệnh: **${type}**\n\n📍 Entry 1: **${p.toFixed(2)}**\n📍 Entry 2: **${entry2.toFixed(2)}**\n🛑 SL: **${sl.toFixed(2)}** (~5u)\n💰 TP: **${tp.toFixed(2)}** (+20u++)\n\n⚠️ *Đi Vol 0.01 cho vốn 113u!*`;
             
-            // Gửi kèm nút bấm để tránh gõ lệnh phiền phức
-            const keyboard = { inline_keyboard: [[{ text: "✅ XONG KÈO (RESET)", callback_data: "done" }]] };
-            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=Markdown&reply_markup=${JSON.stringify(keyboard)}`);
-        }
-
-        async function sendDailyPlan() {
-            const h = Math.max(...globalData.slice(-40).map(x => x[2]));
-            const l = Math.min(...globalData.slice(-40).map(x => x[3]));
-            let plan = `☀️ **BẢN ĐỒ CHIẾN THUẬT SÁNG NAY**\n\n📈 Kháng cự: **${h.toFixed(2)}**\n📉 Hỗ trợ: **${l.toFixed(2)}**\n📝 Kịch bản: Đánh theo kênh giá. Phá biên + Vol lớn thì gồng Trend!`;
-            sendTele(plan);
-        }
-
-        async function scanNews() {
-            try {
-                const r = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN');
-                const d = await r.json();
-                const latest = d.Data[0];
-                if (latest.id !== lastNewsId) {
-                    lastNewsId = latest.id;
-                    let t = latest.title.toLowerCase(), vn = "";
-                    if (t.includes("war") || t.includes("attack")) vn = "🚨 CHIẾN TRANH!";
-                    if (t.includes("trump")) vn = "🇺🇸 TIN TRUMP!";
-                    if (t.includes("yen carry")) vn = "⚠️ YEN CARRY TRADE!";
-                    if (t.includes("binance buys")) vn = "🔥 BINANCE BẮT ĐÁY!";
-                    if (vn) sendTele(vn + "\n📰 " + latest.title);
-                }
-            } catch (e) {}
+            const keyboard = { inline_keyboard: [[{ text: "✅ XONG KÈO", callback_data: "done" }]] };
+            sendTeleWithKB(msg, keyboard);
         }
 
         async function checkTeleCommands() {
             try {
-                // Sửa lỗi báo lặp: Sử dụng lastUpdateId để chỉ lấy tin mới
                 const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=1`);
                 const d = await r.json();
                 if (d.result) {
                     for (let u of d.result) {
                         lastUpdateId = u.update_id;
-                        // Xử lý cả tin nhắn văn bản và nút bấm (callback_query)
-                        let cmd = "";
-                        if (u.message) cmd = u.message.text.toLowerCase();
-                        if (u.callback_query) cmd = u.callback_query.data;
+                        let cmd = u.message ? u.message.text.toLowerCase() : (u.callback_query ? u.callback_query.data : "");
 
                         if (cmd === "done" || cmd === "/done") {
                             isTrading = false;
-                            sendTele("✅ Bot đã Reset. Đang đợi kèo mới!");
+                            sendTele("✅ Đã Reset. Chờ kèo Scalp mới!");
+                        }
+                        if (cmd === "/sltp") {
+                            const p = basePrice + priceOffset;
+                            const atr = calculateATR(globalData);
+                            execute("BUY/SELL (Tùy cấu trúc)", "SOÁT LỆNH NHANH", atr, "N/A");
                         }
                         if (cmd.startsWith("/sync")) {
                             const p = parseFloat(cmd.replace("/sync",""));
                             if (!isNaN(p)) {
                                 priceOffset = p - basePrice;
-                                sendTele(`🎯 Đã khớp giá BingX: ${p.toFixed(2)}`);
+                                sendTele(`🎯 Đã khớp giá sàn: ${p.toFixed(2)}`);
                             }
                         }
                     }
@@ -182,6 +157,10 @@
 
         function sendTele(msg) {
             fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`);
+        }
+
+        function sendTeleWithKB(msg, kb) {
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=Markdown&reply_markup=${JSON.stringify(kb)}`);
         }
     </script>
 </body>
