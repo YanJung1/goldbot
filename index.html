@@ -3,148 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MASTER V29.0 - MULTI-TIMEFRAME & LIQUIDITY</title>
+    <title>MASTER V30.0 - PI ARBITRAGE & CRYPTO</title>
     <style>
-        :root { --bg: #0b0e11; --card: #1e2329; --green: #02c076; --red: #f84960; --gold: #f3ba2f; --blue: #2f8af3; }
+        :root { --bg: #0b0e11; --card: #1e2329; --green: #02c076; --red: #f84960; --gold: #f3ba2f; --blue: #2f8af3; --pi: #6a1b9a; }
         body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; margin: 0; }
-        .card { border: 1px solid #333; border-top: 5px solid var(--gold); border-radius: 15px; padding: 20px; background: var(--card); max-width: 450px; margin: 10px auto; }
-        .price { font-size: 40px; font-weight: bold; margin: 5px 0; color: white; }
+        .card { border: 1px solid #333; border-top: 5px solid var(--pi); border-radius: 15px; padding: 20px; background: var(--card); max-width: 450px; margin: 10px auto; }
         
-        /* Dashboard đa khung */
-        .mtf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 15px; }
-        .mtf-box { background: #161a1e; padding: 5px; border-radius: 5px; font-size: 10px; border: 1px solid #333; }
-        .mtf-box b { display: block; font-size: 12px; margin-top: 2px; }
+        /* Arbitrage Dashboard */
+        .arb-box { display: flex; justify-content: space-between; background: #161a1e; padding: 10px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--gold); }
+        .arb-item { text-align: left; }
+        .arb-item span { font-size: 9px; color: #848e9c; display: block; }
+        .arb-item b { font-size: 14px; color: var(--gold); }
 
-        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 15px 0; }
-        .box { background: #2b3139; padding: 8px; border-radius: 8px; border: 1px solid #383f47; }
-        .box span { display: block; font-size: 8px; color: #848e9c; }
-        .box b { font-size: 13px; color: var(--gold); }
-
-        .liquidity-tag { font-size: 11px; padding: 4px 8px; border-radius: 20px; background: rgba(243, 186, 47, 0.1); color: var(--gold); border: 1px dashed var(--gold); display: inline-block; margin-bottom: 10px; }
-        .trend-up { color: var(--green) !important; }
-        .trend-down { color: var(--red) !important; }
+        .price { font-size: 42px; font-weight: bold; color: white; margin: 5px 0; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0; }
+        .box { background: #2b3139; padding: 10px; border-radius: 8px; border: 1px solid #383f47; }
+        
+        .fengshui { font-size: 11px; font-style: italic; color: #848e9c; margin-top: 10px; padding: 5px; border-top: 1px dashed #333; }
+        .status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(47, 138, 243, 0.1); color: var(--blue); }
     </style>
 </head>
 <body onload="initBot()">
     <div class="card">
-        <div class="mtf-grid">
-            <div class="mtf-box">D1 TREND <b id="trendD1">--</b></div>
-            <div class="mtf-box">H4 TREND <b id="trendH4">--</b></div>
-            <div class="mtf-box">H1 TREND <b id="trendH1">--</b></div>
+        <!-- Arbitrage UI -->
+        <div class="arb-box">
+            <div class="arb-item"><span>PI HTX</span><b id="piHTX">$0.00</b></div>
+            <div class="arb-item"><span>PI BITMART</span><b id="piBit">$0.00</b></div>
+            <div class="arb-item" style="text-align:right;"><span>CHÊNH LỆCH</span><b id="piDiff" style="color:var(--green);">0%</b></div>
         </div>
 
         <div style="display:flex; justify-content: space-between; align-items: center;">
-            <b id="symText" style="color:var(--gold); font-size: 20px;">BTC/USDT</b>
-            <div id="liquidityStatus" class="liquidity-tag">ĐANG SOI THANH KHOẢN...</div>
+            <span class="status-tag" id="timeZodiac">GIỜ HOÀNG ĐẠO: --</span>
+            <span id="liqWarning" style="color:var(--red); font-size:10px; font-weight:bold;"></span>
         </div>
 
         <div id="mainPrice" class="price">0.00</div>
+        <div style="color:var(--blue); font-size: 12px; margin-bottom: 10px;">BTC/USDT - XU HƯỚNG ĐA KHUNG</div>
         
         <div class="grid">
-            <div class="box"><span>EMA 200 (5m)</span><b id="emaVal">--</b></div>
             <div class="box"><span>RSI (14)</span><b id="rsiVal">--</b></div>
-            <div class="box"><span>VOL POWER</span><b id="volStatus">--</b></div>
+            <div class="box"><span>QUÉT THANH KHOẢN</span><b id="liqStatus">--</b></div>
         </div>
 
-        <div id="botStatus" style="font-weight: bold; color: var(--blue); font-size: 13px; margin-bottom: 10px;">ĐANG QUÉT CẤU TRÚC THỊ TRƯỜNG...</div>
+        <div id="botStatus" style="font-weight: bold; color: var(--gold); font-size: 13px;">ĐANG QUÉT TÍN HIỆU...</div>
+        
+        <div class="fengshui" id="fengshuiNote">Đang xem quẻ thị trường...</div>
     </div>
 
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
         let currentSymbol = "BTCUSDT", isTrading = false, lastId = 0;
-        let mtfData = { d1: "", h4: "", h1: "" };
 
         async function initBot() {
-            sendTele("💎 **V29.0 ULTRA ACTIVATED**\nĐã tích hợp: Quét thanh khoản & Phân tích Đa khung.");
+            sendTele("🛸 **V30.0 ULTIMATE DEPLOYED**\nPi Arbitrage + BTC Liquidity Sweep + FengShui Mode.");
             update();
             setInterval(update, 5000);
             setInterval(checkTele, 3000);
         }
 
-        async function fetchKlines(interval, limit) {
-            const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${interval}&limit=${limit}`);
-            return await r.json();
-        }
-
         async function update() {
             try {
-                // 1. Lấy dữ liệu đa khung (MTF)
-                const [d1, h4, h1, m5] = await Promise.all([
-                    fetchKlines('1d', 20), fetchKlines('4h', 20), fetchKlines('1h', 20), fetchKlines('5m', 100)
+                // 1. Check Pi Arbitrage (HTX vs BitMart)
+                const [htxR, bitR] = await Promise.all([
+                    fetch('https://api.huobi.pro/market/detail/merged?symbol=piusdt'),
+                    fetch('https://api.bitmart.com/spot/v1/ticker?symbol=PI_USDT')
                 ]);
+                
+                const htxD = await htxR.json();
+                const bitD = await bitR.json();
+                
+                const pHTX = htxD.tick.close;
+                const pBit = parseFloat(bitD.data.tickers[0].last_price);
+                const diff = ((pHTX - pBit) / pBit) * 100;
 
-                // 2. Nhận định xu hướng khung lớn
-                mtfData.d1 = parseFloat(d1[d1.length-1][4]) > parseFloat(d1[d1.length-2][4]) ? "TĂNG" : "GIẢM";
-                mtfData.h4 = parseFloat(h4[h4.length-1][4]) > parseFloat(h4[h4.length-2][4]) ? "TĂNG" : "GIẢM";
-                mtfData.h1 = parseFloat(h1[h1.length-1][4]) > parseFloat(h1[h1.length-2][4]) ? "TĂNG" : "GIẢM";
+                document.getElementById('piHTX').innerText = `$${pHTX.toFixed(2)}`;
+                document.getElementById('piBit').innerText = `$${pBit.toFixed(2)}`;
+                document.getElementById('piDiff').innerText = `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
+                document.getElementById('piDiff').style.color = Math.abs(diff) > 2 ? "#f84960" : "#02c076";
 
-                updateUI_MTF();
-
-                // 3. Phân tích khung vào lệnh (5m)
+                // 2. Check BTC Binance
+                const bR = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=5m&limit=100`);
+                const m5 = await bR.json();
                 const prices = m5.map(x => parseFloat(x[4]));
                 const currentPrice = prices[prices.length - 1];
-                const ema200 = calculateEMA(prices, 100); // Dùng 100 nến cho m5
                 const rsi = calculateRSI(prices);
-                
-                // 4. Check Quét thanh khoản (Liquidity Sweep)
-                const last20High = Math.max(...m5.slice(-20, -1).map(x => parseFloat(x[2])));
+
+                // Check Quét thanh khoản
                 const last20Low = Math.min(...m5.slice(-20, -1).map(x => parseFloat(x[3])));
-                const currentLow = parseFloat(m5[m5.length-1][3]);
-                const currentHigh = parseFloat(m5[m5.length-1][2]);
+                const isSweep = currentPrice < last20Low ? "QUÉT ĐÁY 💧" : "ỔN ĐỊNH";
 
-                let liqStatus = "ỔN ĐỊNH";
-                let isSweepLong = currentLow < last20Low && currentPrice > last20Low; // Chọc đáy rồi rút
-                let isSweepShort = currentHigh > last20High && currentPrice < last20High; // Chọc đỉnh rồi rút
-
-                if(isSweepLong) liqStatus = "QUÉT THANH KHOẢN LONG 💧";
-                if(isSweepShort) liqStatus = "QUÉT THANH KHOẢN SHORT ⚡";
-                document.getElementById('liquidityStatus').innerText = liqStatus;
-
-                // 5. Cập nhật UI chính
                 document.getElementById('mainPrice').innerText = currentPrice.toLocaleString();
-                document.getElementById('emaVal').innerText = ema200.toFixed(1);
                 document.getElementById('rsiVal').innerText = rsi.toFixed(1);
+                document.getElementById('liqStatus').innerText = isSweep;
 
-                // 6. Logic vào lệnh kết hợp Đa khung + Thanh khoản
-                if (!isTrading) {
-                    checkSignal(currentPrice, rsi, ema200, isSweepLong, isSweepShort, last20Low, last20High);
+                updateZodiac();
+
+                // 3. Logic cảnh báo Arbitrage lớn
+                if (Math.abs(diff) > 5 && !isTrading) {
+                    sendTele(`🚨 **PI ARBITRAGE ALERT**\nHTX ($${pHTX}) lệch BitMart ($${pBit}) tới ${diff.toFixed(2)}%.\nSắp có biến động mạnh, chuẩn bị húp!`);
                 }
-            } catch(e) { console.log(e); }
+
+                if (!isTrading && rsi < 35 && isSweep.includes("QUÉT")) {
+                    execute("LONG BTC (PRO)", currentPrice, "Hợp lưu Quét đáy + RSI");
+                }
+            } catch(e) { console.error(e); }
         }
 
-        function updateUI_MTF() {
-            const d1El = document.getElementById('trendD1');
-            const h4El = document.getElementById('trendH4');
-            const h1El = document.getElementById('trendH1');
-
-            d1El.innerText = mtfData.d1; d1El.className = mtfData.d1 === "TĂNG" ? "trend-up" : "trend-down";
-            h4El.innerText = mtfData.h4; h4El.className = mtfData.h4 === "TĂNG" ? "trend-up" : "trend-down";
-            h1El.innerText = mtfData.h1; h1El.className = mtfData.h1 === "TĂNG" ? "trend-up" : "trend-down";
-        }
-
-        function checkSignal(p, rsi, ema, isSweepLong, isSweepShort, low, high) {
-            // ĐIỀU KIỆN LONG: 
-            // 1. H4 hoặc D1 phải là TĂNG (Thuận trend lớn)
-            // 2. Có hiện tượng Quét thanh khoản đáy (Sweep Long)
-            // 3. RSI quá bán (< 35)
-            if ((mtfData.h4 === "TĂNG") && isSweepLong && rsi < 40) {
-                execute("LONG (LIQUIDITY SWEEP) 🏹", p, low, "MUA KHI QUÉT ĐÁY");
-            }
-            // ĐIỀU KIỆN SHORT:
-            // 1. H4 hoặc D1 phải là GIẢM
-            // 2. Có hiện tượng Quét thanh khoản đỉnh (Sweep Short)
-            // 3. RSI quá mua (> 65)
-            else if ((mtfData.h4 === "GIẢM") && isSweepShort && rsi > 60) {
-                execute("SHORT (LIQUIDITY SWEEP) 🎯", p, high, "BÁN KHI QUÉT ĐỈNH");
-            }
-        }
-
-        function calculateEMA(data, period) {
-            let k = 2 / (period + 1);
-            let ema = data[0];
-            for (let i = 1; i < data.length; i++) ema = (data[i] * k) + (ema * (1 - k));
-            return ema;
+        function updateZodiac() {
+            const hour = new Date().getHours();
+            let zodiac = "", note = "";
+            if (hour >= 23 || hour < 1) { zodiac = "GIỜ TÝ"; note = "Cá mập Mỹ hoạt động mạnh, ưu tiên đặt SL chặt."; }
+            else if (hour >= 7 && hour < 9) { zodiac = "GIỜ THÌN"; note = "Dân Pi dậy điểm danh, tin tức Telegram nổ ra."; }
+            else if (hour >= 13 && hour < 15) { zodiac = "GIỜ MÙI"; note = "Thị trường thường đi ngang, hạn chế đòn bẩy 150x."; }
+            else { zodiac = "GIỜ BÌNH THƯỜNG"; note = "Cứ đúng kỹ thuật mà đánh, tâm bất biến giữa dòng đời vạn biến."; }
+            
+            document.getElementById('timeZodiac').innerText = `GIỜ HOÀNG ĐẠO: ${zodiac}`;
+            document.getElementById('fengshuiNote').innerText = `💡 ${note}`;
         }
 
         function calculateRSI(prices) {
@@ -156,12 +131,9 @@
             return 100 - (100 / (1 + (gains / (losses || 1))));
         }
 
-        function execute(type, p, entryLimit, note) {
+        function execute(type, p, note) {
             isTrading = true;
-            const sl = type.includes("LONG") ? entryLimit * 0.995 : entryLimit * 1.005;
-            const tp = type.includes("LONG") ? p * 1.015 : p * 0.985;
-
-            let msg = `💎 **KÈO PRO V29.0 (ĐA KHUNG)**\n\n📌 Lệnh: **${type}**\n📝 Note: ${note}\n\n🌍 Trend D1/H4: **${mtfData.d1}/${mtfData.h4}**\n📍 Entry: **${p}**\n🛑 SL: **${sl.toFixed(2)}**\n💰 TP: **${tp.toFixed(2)}**\n\n⚠️ Đòn bẩy 150x - Quản lý vốn chặt!`;
+            let msg = `🔥 **TÍN HIỆU XUYÊN KHÔNG V30.0**\n\n📌 Lệnh: **${type}**\n📝 Note: ${note}\n📍 Entry: **${p}**\n\n🥧 **Dữ liệu Pi:**\n- HTX: $${document.getElementById('piHTX').innerText}\n- Lệch: ${document.getElementById('piDiff').innerText}`;
             
             fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
                 method:'POST', headers:{'Content-Type':'application/json'},
@@ -177,7 +149,7 @@
                     lastId = u.update_id;
                     if((u.callback_query?.data || u.message?.text) === "done") {
                         isTrading = false;
-                        sendTele("🔄 Hệ thống đã sẵn sàng cho cú quét tiếp theo!");
+                        sendTele("🔄 Đã Reset. Chúc bạn một ngày giao dịch đại cát!");
                     }
                 });
             } catch(e) {}
