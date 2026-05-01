@@ -3,123 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MASTER V30.0 - PI ARBITRAGE & CRYPTO</title>
+    <title>MASTER V31 - MULTI-ASSET TRACKER</title>
     <style>
         :root { --bg: #0b0e11; --card: #1e2329; --green: #02c076; --red: #f84960; --gold: #f3ba2f; --blue: #2f8af3; --pi: #6a1b9a; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; margin: 0; }
-        .card { border: 1px solid #333; border-top: 5px solid var(--pi); border-radius: 15px; padding: 20px; background: var(--card); max-width: 450px; margin: 10px auto; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; padding: 10px; margin: 0; }
+        .card { border: 1px solid #333; border-top: 5px solid var(--gold); border-radius: 15px; padding: 15px; background: var(--card); max-width: 450px; margin: auto; }
         
-        /* Arbitrage Dashboard */
-        .arb-box { display: flex; justify-content: space-between; background: #161a1e; padding: 10px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--gold); }
-        .arb-item { text-align: left; }
-        .arb-item span { font-size: 9px; color: #848e9c; display: block; }
-        .arb-item b { font-size: 14px; color: var(--gold); }
+        /* Cấu trúc 3 dòng chính */
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #2b3139; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #444; }
+        .row.btc { border-left-color: var(--gold); }
+        .row.eth { border-left-color: var(--blue); }
+        .row.pi { border-left-color: var(--pi); }
+        
+        .info { text-align: left; }
+        .info span { font-size: 10px; color: #848e9c; display: block; text-transform: uppercase; }
+        .info b { font-size: 16px; display: block; }
+        
+        .stats { text-align: right; }
+        .stats span { font-size: 9px; color: #848e9c; display: block; }
+        .stats b { font-size: 12px; }
 
-        .price { font-size: 42px; font-weight: bold; color: white; margin: 5px 0; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0; }
-        .box { background: #2b3139; padding: 10px; border-radius: 8px; border: 1px solid #383f47; }
-        
-        .fengshui { font-size: 11px; font-style: italic; color: #848e9c; margin-top: 10px; padding: 5px; border-top: 1px dashed #333; }
-        .status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(47, 138, 243, 0.1); color: var(--blue); }
+        .bot-status { font-size: 11px; color: var(--gold); margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body onload="initBot()">
     <div class="card">
-        <!-- Arbitrage UI -->
-        <div class="arb-box">
-            <div class="arb-item"><span>PI HTX</span><b id="piHTX">$0.00</b></div>
-            <div class="arb-item"><span>PI BITMART</span><b id="piBit">$0.00</b></div>
-            <div class="arb-item" style="text-align:right;"><span>CHÊNH LỆCH</span><b id="piDiff" style="color:var(--green);">0%</b></div>
+        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--gold);">⚡ HỆ THỐNG GIAO DỊCH V31.0</h3>
+
+        <!-- Dòng 1: BTC -->
+        <div class="row btc">
+            <div class="info"><span>BTC/USDT</span><b id="priceBTC">0.00</b></div>
+            <div class="stats"><span>RSI / LIQ</span><b id="statBTC">-- / --</b></div>
         </div>
 
-        <div style="display:flex; justify-content: space-between; align-items: center;">
-            <span class="status-tag" id="timeZodiac">GIỜ HOÀNG ĐẠO: --</span>
-            <span id="liqWarning" style="color:var(--red); font-size:10px; font-weight:bold;"></span>
+        <!-- Dòng 2: ETH -->
+        <div class="row eth">
+            <div class="info"><span>ETH/USDT</span><b id="priceETH">0.00</b></div>
+            <div class="stats"><span>RSI / LIQ</span><b id="statETH">-- / --</b></div>
         </div>
 
-        <div id="mainPrice" class="price">0.00</div>
-        <div style="color:var(--blue); font-size: 12px; margin-bottom: 10px;">BTC/USDT - XU HƯỚNG ĐA KHUNG</div>
-        
-        <div class="grid">
-            <div class="box"><span>RSI (14)</span><b id="rsiVal">--</b></div>
-            <div class="box"><span>QUÉT THANH KHOẢN</span><b id="liqStatus">--</b></div>
+        <!-- Dòng 3: PI (Arbitrage) -->
+        <div class="row pi">
+            <div class="info"><span>PI (HTX/BIT)</span><b id="pricePI">0.00</b></div>
+            <div class="stats"><span>CHÊNH LỆCH</span><b id="diffPI">0.00%</b></div>
         </div>
 
-        <div id="botStatus" style="font-weight: bold; color: var(--gold); font-size: 13px;">ĐANG QUÉT TÍN HIỆU...</div>
-        
-        <div class="fengshui" id="fengshuiNote">Đang xem quẻ thị trường...</div>
+        <div class="bot-status" id="botStatus">ĐANG KHỞI TẠO TÍN HIỆU...</div>
     </div>
 
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
-        let currentSymbol = "BTCUSDT", isTrading = false, lastId = 0;
+        const PROXY = "https://api.allorigins.win/raw?url=";
 
         async function initBot() {
-            sendTele("🛸 **V30.0 ULTIMATE DEPLOYED**\nPi Arbitrage + BTC Liquidity Sweep + FengShui Mode.");
-            update();
-            setInterval(update, 5000);
-            setInterval(checkTele, 3000);
+            updateData();
+            setInterval(updateData, 6000); // 6 giây cập nhật để tránh lỗi rate limit
         }
 
-        async function update() {
+        async function updateData() {
             try {
-                // 1. Check Pi Arbitrage (HTX vs BitMart)
-                const [htxR, bitR] = await Promise.all([
-                    fetch('https://api.huobi.pro/market/detail/merged?symbol=piusdt'),
-                    fetch('https://api.bitmart.com/spot/v1/ticker?symbol=PI_USDT')
-                ]);
+                // 1. Lấy giá BTC & ETH từ Binance
+                const cryptoRes = await fetch('https://api1.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT"]');
+                const cryptoData = await cryptoRes.json();
                 
-                const htxD = await htxR.json();
-                const bitD = await bitR.json();
-                
+                updateAsset("BTC", cryptoData[0]);
+                updateAsset("ETH", cryptoData[1]);
+
+                // 2. Lấy giá Pi (HTX & BitMart) qua Proxy
+                fetchPi();
+
+                document.getElementById('botStatus').innerText = "HỆ THỐNG ĐANG QUÉT ĐA KHUNG...";
+            } catch (e) {
+                document.getElementById('botStatus').innerText = "LỖI KẾT NỐI SÀN!";
+            }
+        }
+
+        async function updateAsset(name, data) {
+            const price = parseFloat(data.lastPrice);
+            document.getElementById(`price${name}`).innerText = price.toLocaleString();
+            
+            // Lấy thêm nến để tính RSI & Liq cho dòng đó
+            const kRes = await fetch(`https://api1.binance.com/api/v3/klines?symbol=${name}USDT&interval=5m&limit=20`);
+            const kData = await kRes.json();
+            const prices = kData.map(x => parseFloat(x[4]));
+            const rsi = calculateRSI(prices);
+            
+            const lastLow = Math.min(...kData.slice(-10, -1).map(x => parseFloat(x[3])));
+            const liq = parseFloat(kData[kData.length-1][3]) < lastLow ? "QUÉT 💧" : "ỔN";
+            
+            document.getElementById(`stat${name}`).innerText = `${rsi.toFixed(1)} / ${liq}`;
+            
+            // Bắn tín hiệu nếu chạm điều kiện (ví dụ RSI cực thấp)
+            if (rsi < 25) sendTele(`🚀 **BÁO ĐỘNG ${name}**\nGiá: ${price}\nRSI: ${rsi.toFixed(1)} - QUÁ BÁN!`);
+        }
+
+        async function fetchPi() {
+            try {
+                const htx = await fetch(PROXY + encodeURIComponent("https://api.huobi.pro/market/detail/merged?symbol=piusdt"));
+                const htxD = await htx.json();
                 const pHTX = htxD.tick.close;
+                
+                const bit = await fetch(PROXY + encodeURIComponent("https://api.bitmart.com/spot/v1/ticker?symbol=PI_USDT"));
+                const bitD = await bit.json();
                 const pBit = parseFloat(bitD.data.tickers[0].last_price);
+
                 const diff = ((pHTX - pBit) / pBit) * 100;
 
-                document.getElementById('piHTX').innerText = `$${pHTX.toFixed(2)}`;
-                document.getElementById('piBit').innerText = `$${pBit.toFixed(2)}`;
-                document.getElementById('piDiff').innerText = `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
-                document.getElementById('piDiff').style.color = Math.abs(diff) > 2 ? "#f84960" : "#02c076";
-
-                // 2. Check BTC Binance
-                const bR = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=5m&limit=100`);
-                const m5 = await bR.json();
-                const prices = m5.map(x => parseFloat(x[4]));
-                const currentPrice = prices[prices.length - 1];
-                const rsi = calculateRSI(prices);
-
-                // Check Quét thanh khoản
-                const last20Low = Math.min(...m5.slice(-20, -1).map(x => parseFloat(x[3])));
-                const isSweep = currentPrice < last20Low ? "QUÉT ĐÁY 💧" : "ỔN ĐỊNH";
-
-                document.getElementById('mainPrice').innerText = currentPrice.toLocaleString();
-                document.getElementById('rsiVal').innerText = rsi.toFixed(1);
-                document.getElementById('liqStatus').innerText = isSweep;
-
-                updateZodiac();
-
-                // 3. Logic cảnh báo Arbitrage lớn
-                if (Math.abs(diff) > 5 && !isTrading) {
-                    sendTele(`🚨 **PI ARBITRAGE ALERT**\nHTX ($${pHTX}) lệch BitMart ($${pBit}) tới ${diff.toFixed(2)}%.\nSắp có biến động mạnh, chuẩn bị húp!`);
-                }
-
-                if (!isTrading && rsi < 35 && isSweep.includes("QUÉT")) {
-                    execute("LONG BTC (PRO)", currentPrice, "Hợp lưu Quét đáy + RSI");
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        function updateZodiac() {
-            const hour = new Date().getHours();
-            let zodiac = "", note = "";
-            if (hour >= 23 || hour < 1) { zodiac = "GIỜ TÝ"; note = "Cá mập Mỹ hoạt động mạnh, ưu tiên đặt SL chặt."; }
-            else if (hour >= 7 && hour < 9) { zodiac = "GIỜ THÌN"; note = "Dân Pi dậy điểm danh, tin tức Telegram nổ ra."; }
-            else if (hour >= 13 && hour < 15) { zodiac = "GIỜ MÙI"; note = "Thị trường thường đi ngang, hạn chế đòn bẩy 150x."; }
-            else { zodiac = "GIỜ BÌNH THƯỜNG"; note = "Cứ đúng kỹ thuật mà đánh, tâm bất biến giữa dòng đời vạn biến."; }
-            
-            document.getElementById('timeZodiac').innerText = `GIỜ HOÀNG ĐẠO: ${zodiac}`;
-            document.getElementById('fengshuiNote').innerText = `💡 ${note}`;
+                document.getElementById('pricePI').innerText = `$${pHTX.toFixed(2)}`;
+                document.getElementById('diffPI').innerText = `${diff.toFixed(2)}%`;
+                document.getElementById('diffPI').style.color = Math.abs(diff) > 2 ? "#f84960" : "#02c076";
+            } catch (e) {}
         }
 
         function calculateRSI(prices) {
@@ -131,31 +125,9 @@
             return 100 - (100 / (1 + (gains / (losses || 1))));
         }
 
-        function execute(type, p, note) {
-            isTrading = true;
-            let msg = `🔥 **TÍN HIỆU XUYÊN KHÔNG V30.0**\n\n📌 Lệnh: **${type}**\n📝 Note: ${note}\n📍 Entry: **${p}**\n\n🥧 **Dữ liệu Pi:**\n- HTX: $${document.getElementById('piHTX').innerText}\n- Lệch: ${document.getElementById('piDiff').innerText}`;
-            
-            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({chat_id:CHAT_ID, text:msg, parse_mode:'Markdown', reply_markup:{inline_keyboard:[[{text:"✅ Đã khớp/Reset", callback_data:"done"}]]}})
-            });
+        function sendTele(m) {
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}&parse_mode=Markdown`);
         }
-
-        async function checkTele() {
-            try {
-                const r = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates?offset=${lastId+1}`);
-                const d = await r.json();
-                if(d.result) d.result.forEach(u => {
-                    lastId = u.update_id;
-                    if((u.callback_query?.data || u.message?.text) === "done") {
-                        isTrading = false;
-                        sendTele("🔄 Đã Reset. Chúc bạn một ngày giao dịch đại cát!");
-                    }
-                });
-            } catch(e) {}
-        }
-
-        function sendTele(m) { fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}&parse_mode=Markdown`); }
     </script>
 </body>
 </html>
