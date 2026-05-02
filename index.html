@@ -3,86 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ELITE TERMINAL V35.0</title>
+    <title>TERMINAL V36.0</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #030303; --card: #0d0e12; --btc: #f3ba2f; --eth: #627eea; --sol: #14f195; --bnb: #f0b90b; --red: #ff3e3e; --green: #00ff88; }
-        body { background: var(--bg); color: #ececec; font-family: 'JetBrains Mono', monospace; margin: 0; padding: 15px; display: flex; justify-content: center; }
-        .terminal { width: 100%; max-width: 450px; background: var(--card); border-radius: 12px; border: 1px solid #222; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 20px; }
-        .coin-row { background: #14151a; border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid #1f1f1f; }
-        .top-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .price { font-size: 22px; font-weight: 800; letter-spacing: -1px; }
-        .bot-line { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; border-top: 1px solid #222; padding-top: 10px; }
-        .label { font-size: 8px; color: #444; display: block; }
-        .val { font-size: 10px; font-weight: bold; }
-        .signal-tag { font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: bold; background: #1a1a1a; color: #555; }
+        :root { --bg: #030303; --card: #0d0e12; --green: #00ff88; --red: #ff3e3e; }
+        body { background: var(--bg); color: #ececec; font-family: 'JetBrains Mono', monospace; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .terminal { width: 100%; max-width: 450px; background: var(--card); border-radius: 12px; border: 1px solid #222; padding: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 15px; }
+        .coin-row { background: #14151a; border-radius: 8px; padding: 12px; margin-bottom: 10px; border-left: 4px solid #333; }
+        .price { font-size: 20px; font-weight: 800; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-top: 8px; border-top: 1px solid #222; padding-top: 8px; }
+        .val { font-size: 10px; font-weight: bold; color: #aaa; }
+        button { background: #1a1a1a; color: var(--green); border: 1px solid var(--green); padding: 8px 15px; border-radius: 5px; cursor: pointer; font-family: inherit; font-size: 10px; margin-top: 10px; width: 100%; }
+        button:active { background: var(--green); color: #000; }
+        .blink { animation: b 1.5s infinite; } @keyframes b { 50% { opacity: 0.3; } }
     </style>
 </head>
-<body onload="initSystem()">
+<body onload="init()">
     <div class="terminal">
         <div class="header">
-            <h1 style="font-size:12px; color:#555;">ELITE V35.0</h1>
-            <div id="clock" style="font-size:11px; color:var(--green);">00:00:00</div>
+            <span style="font-size:10px; color:#555;">PRO TERMINAL V36</span>
+            <div id="clock" style="font-size:10px; color:var(--green);">00:00:00</div>
         </div>
-        <div id="display">
-            <!-- Tự động tạo hàng cho BTC, ETH, SOL, BNB -->
-        </div>
+        <div id="display"></div>
+        <button onclick="testTele()">⚡ NHẤN ĐỂ KIỂM TRA KẾT NỐI TELEGRAM</button>
     </div>
+
     <script>
         const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
         const CHAT_ID = "7994694689";
-        const COINS = ["BTC", "ETH", "SOL", "BNB"];
-        const COLORS = ["var(--btc)", "var(--eth)", "var(--sol)", "var(--bnb)"];
+        const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA"];
+        const COLORS = ["#f3ba2f", "#627eea", "#14f195", "#f0b90b", "#23292f", "#0033ad"];
 
-        async function initSystem() {
+        function init() {
             const container = document.getElementById('display');
             COINS.forEach((coin, i) => {
                 container.innerHTML += `
-                    <div class="coin-row" style="border-top: 3px solid ${COLORS[i]}">
-                        <div class="top-line"><span style="color:${COLORS[i]}">${coin}/USDT</span><span id="p${coin}" class="price">0.00</span></div>
-                        <div class="bot-line">
-                            <div><span class="label">RSI(14)</span><span id="r${coin}" class="val">--</span></div>
-                            <div><span class="label">LIQUIDITY</span><span id="l${coin}" class="val">STABLE</span></div>
-                            <div style="text-align:right;"><span id="t${coin}" class="signal-tag">MONITORING</span></div>
+                    <div class="coin-row" style="border-left-color: ${COLORS[i]}">
+                        <div style="display:flex; justify-content:space-between">
+                            <span style="color:${COLORS[i]}; font-weight:800">${coin}</span>
+                            <span id="p${coin}" class="price">0.00</span>
+                        </div>
+                        <div class="grid">
+                            <div><span style="font-size:8px; color:#444">RSI</span><br><span id="r${coin}" class="val">--</span></div>
+                            <div><span style="font-size:8px; color:#444">LIQ</span><br><span id="l${coin}" class="val">STABLE</span></div>
+                            <div style="text-align:right"><span id="s${coin}" style="font-size:9px; color:#444">WAIT</span></div>
                         </div>
                     </div>`;
             });
-            update(); setInterval(update, 5000);
+            update(); setInterval(update, 6000);
             setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString(), 1000);
         }
 
         async function update() {
             try {
-                const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT"]`);
+                const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT"]`);
                 const data = await res.json();
                 for(let i=0; i<COINS.length; i++) {
-                    const name = COINS[i];
-                    const price = parseFloat(data[i].price);
+                    const name = COINS[i], price = parseFloat(data[i].price);
                     document.getElementById(`p${name}`).innerText = price.toLocaleString();
                     
                     const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=${name}USDT&interval=5m&limit=21`);
                     const kD = await k.json();
                     const closes = kD.map(x => parseFloat(x[4]));
                     const rsi = calcRSI(closes);
-                    const low = Math.min(...kD.slice(-12, -1).map(x => parseFloat(x[3])));
-                    const isSweep = parseFloat(kD[kD.length-1][3]) < low;
+                    const isSweep = parseFloat(kD[kD.length-1][3]) < Math.min(...kD.slice(-12, -1).map(x => parseFloat(x[3])));
 
                     document.getElementById(`r${name}`).innerText = rsi.toFixed(1);
-                    const lEl = document.getElementById(`l${name}`);
-                    const tEl = document.getElementById(`t${name}`);
+                    const lEl = document.getElementById(`l${name}`), sEl = document.getElementById(`s${name}`);
 
-                    if (isSweep) { lEl.innerText = "SWEEP! 💧"; lEl.style.color = "var(--red)"; } 
+                    if (isSweep) { lEl.innerText = "SWEEP! 💧"; lEl.style.color = "var(--red)"; }
                     else { lEl.innerText = "STABLE"; lEl.style.color = "#444"; }
 
                     if (rsi < 28 && isSweep) {
-                        tEl.innerText = "BUY ALERT"; tEl.style.background = "var(--green)"; tEl.style.color = "#000";
-                        sendTele(`🔥 **LONG ${name}**\nGiá: ${price}\nRSI: ${rsi.toFixed(1)}\nĐòn bẩy gợi ý: 125x-150x`);
+                        sEl.innerText = "LONG 🚀"; sEl.style.color = "var(--green)";
+                        sendTele(`🔥 **KÈO 150X: LONG ${name}**\nGiá: ${price}\nRSI: ${rsi.toFixed(1)}\n⚠️ Quét đáy thành công!`);
                     } else if (rsi > 72) {
-                        tEl.innerText = "SELL ALERT"; tEl.style.background = "var(--red)"; tEl.style.color = "#fff";
-                    } else {
-                        tEl.innerText = "MONITORING"; tEl.style.background = "#1a1a1a"; tEl.style.color = "#555";
-                    }
+                        sEl.innerText = "SHORT 🔻"; sEl.style.color = "var(--red)";
+                    } else { sEl.innerText = "WAIT"; sEl.style.color = "#444"; }
                 }
             } catch(e) {}
         }
@@ -98,6 +96,11 @@
 
         function sendTele(m) {
             fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}&parse_mode=Markdown`);
+        }
+
+        function testTele() {
+            sendTele("🔔 **KẾT NỐI THÀNH CÔNG!**\nTerminal V36.0 đã sẵn sàng nhận lệnh.");
+            alert("Đã gửi tin nhắn thử nghiệm! Hãy kiểm tra Telegram.");
         }
     </script>
 </body>
