@@ -3,130 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MASTER V31 - MULTI-ASSET TRACKER</title>
+    <title>NEON TRADING V32.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0b0e11; --card: #1e2329; --green: #02c076; --red: #f84960; --gold: #f3ba2f; --blue: #2f8af3; --pi: #6a1b9a; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; padding: 10px; margin: 0; }
-        .card { border: 1px solid #333; border-top: 5px solid var(--gold); border-radius: 15px; padding: 15px; background: var(--card); max-width: 450px; margin: auto; }
+        :root { --bg: #050505; --card: #0f1014; --gold: #f3ba2f; --blue: #3773f5; --purple: #a020f0; --green: #00ff88; --red: #ff3e3e; }
+        body { background: var(--bg); color: #e0e0e0; font-family: 'JetBrains Mono', monospace; margin: 0; display: flex; justify-content: center; padding-top: 20px; }
+        .dashboard { width: 95%; max-width: 420px; background: var(--card); border-radius: 24px; padding: 24px; border: 1px solid #1f2226; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
         
-        /* Cấu trúc 3 dòng chính */
-        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #2b3139; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #444; }
-        .row.btc { border-left-color: var(--gold); }
-        .row.eth { border-left-color: var(--blue); }
-        .row.pi { border-left-color: var(--pi); }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+        .header h2 { font-size: 14px; letter-spacing: 2px; color: #555; margin: 0; }
         
-        .info { text-align: left; }
-        .info span { font-size: 10px; color: #848e9c; display: block; text-transform: uppercase; }
-        .info b { font-size: 16px; display: block; }
+        .asset-row { background: #16171d; border-radius: 16px; padding: 18px; margin-bottom: 12px; border: 1px solid transparent; transition: all 0.3s; position: relative; overflow: hidden; }
+        .asset-row:hover { border-color: #333; transform: translateY(-2px); }
         
-        .stats { text-align: right; }
-        .stats span { font-size: 9px; color: #848e9c; display: block; }
-        .stats b { font-size: 12px; }
+        /* Hiệu ứng tia sáng cho từng loại coin */
+        .btc-line { border-left: 4px solid var(--gold); }
+        .eth-line { border-left: 4px solid var(--blue); }
+        .pi-line { border-left: 4px solid var(--purple); }
 
-        .bot-status { font-size: 11px; color: var(--gold); margin-top: 10px; font-weight: bold; }
+        .top-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .symbol { font-size: 12px; color: #888; font-weight: bold; }
+        .price { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -1px; }
+        
+        .bottom-info { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid #222; padding-top: 10px; }
+        .label { font-size: 9px; color: #555; text-transform: uppercase; }
+        .val { font-size: 12px; font-weight: bold; }
+
+        .status-bar { text-align: center; font-size: 10px; color: #444; margin-top: 20px; letter-spacing: 1px; }
+        .blink { animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
     </style>
 </head>
-<body onload="initBot()">
-    <div class="card">
-        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--gold);">⚡ HỆ THỐNG GIAO DỊCH V31.0</h3>
-
-        <!-- Dòng 1: BTC -->
-        <div class="row btc">
-            <div class="info"><span>BTC/USDT</span><b id="priceBTC">0.00</b></div>
-            <div class="stats"><span>RSI / LIQ</span><b id="statBTC">-- / --</b></div>
+<body onload="startSystem()">
+    <div class="dashboard">
+        <div class="header">
+            <h2>TERMINAL V32.0</h2>
+            <div id="clock" style="font-size: 12px; color: var(--green);">00:00:00</div>
         </div>
 
-        <!-- Dòng 2: ETH -->
-        <div class="row eth">
-            <div class="info"><span>ETH/USDT</span><b id="priceETH">0.00</b></div>
-            <div class="stats"><span>RSI / LIQ</span><b id="statETH">-- / --</b></div>
+        <!-- BTC -->
+        <div class="asset-row btc-line">
+            <div class="top-info">
+                <span class="symbol">BTC / USDT</span>
+                <span id="priceBTC" class="price">0.00</span>
+            </div>
+            <div class="bottom-info">
+                <div><span class="label">RSI(14)</span><div id="rsiBTC" class="val">--</div></div>
+                <div style="text-align:right;"><span class="label">Market Liquidity</span><div id="liqBTC" class="val">SCANNING</div></div>
+            </div>
         </div>
 
-        <!-- Dòng 3: PI (Arbitrage) -->
-        <div class="row pi">
-            <div class="info"><span>PI (HTX/BIT)</span><b id="pricePI">0.00</b></div>
-            <div class="stats"><span>CHÊNH LỆCH</span><b id="diffPI">0.00%</b></div>
+        <!-- ETH -->
+        <div class="asset-row eth-line">
+            <div class="top-info">
+                <span class="symbol">ETH / USDT</span>
+                <span id="priceETH" class="price">0.00</span>
+            </div>
+            <div class="bottom-info">
+                <div><span class="label">RSI(14)</span><div id="rsiETH" class="val">--</div></div>
+                <div style="text-align:right;"><span class="label">Market Liquidity</span><div id="liqETH" class="val">SCANNING</div></div>
+            </div>
         </div>
 
-        <div class="bot-status" id="botStatus">ĐANG KHỞI TẠO TÍN HIỆU...</div>
+        <!-- PI -->
+        <div class="asset-row pi-line">
+            <div class="top-info">
+                <span class="symbol">PI (IOU)</span>
+                <span id="pricePI" class="price" style="color:var(--purple)">0.00</span>
+            </div>
+            <div class="bottom-info">
+                <div><span class="label">Arbitrage Diff</span><div id="diffPI" class="val">0.00%</div></div>
+                <div style="text-align:right;"><span class="label">Safety Level</span><div id="safePI" class="val" style="color:var(--green)">SECURE</div></div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span class="blink">●</span> LIVE FEED FROM GLOBAL NODES
+        </div>
     </div>
 
     <script>
-        const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
-        const CHAT_ID = "7994694689";
-        const PROXY = "https://api.allorigins.win/raw?url=";
+        const PROXY = "https://corsproxy.io/?";
 
-        async function initBot() {
-            updateData();
-            setInterval(updateData, 6000); // 6 giây cập nhật để tránh lỗi rate limit
+        function startSystem() {
+            updateTick();
+            setInterval(updateTick, 5000);
+            setInterval(() => {
+                document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+            }, 1000);
         }
 
-        async function updateData() {
+        async function updateTick() {
             try {
-                // 1. Lấy giá BTC & ETH từ Binance
-                const cryptoRes = await fetch('https://api1.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT"]');
-                const cryptoData = await cryptoRes.json();
+                // Lấy BTC & ETH
+                const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT"]');
+                const data = await res.json();
                 
-                updateAsset("BTC", cryptoData[0]);
-                updateAsset("ETH", cryptoData[1]);
-
-                // 2. Lấy giá Pi (HTX & BitMart) qua Proxy
+                render("BTC", data[0]);
+                render("ETH", data[1]);
+                
+                // Lấy PI
                 fetchPi();
-
-                document.getElementById('botStatus').innerText = "HỆ THỐNG ĐANG QUÉT ĐA KHUNG...";
-            } catch (e) {
-                document.getElementById('botStatus').innerText = "LỖI KẾT NỐI SÀN!";
-            }
+            } catch (e) { console.log("System Busy"); }
         }
 
-        async function updateAsset(name, data) {
-            const price = parseFloat(data.lastPrice);
-            document.getElementById(`price${name}`).innerText = price.toLocaleString();
+        async function render(name, data) {
+            const p = parseFloat(data.lastPrice);
+            const el = document.getElementById(`price${name}`);
+            el.innerText = p.toLocaleString(undefined, {minimumFractionDigits: 2});
             
-            // Lấy thêm nến để tính RSI & Liq cho dòng đó
-            const kRes = await fetch(`https://api1.binance.com/api/v3/klines?symbol=${name}USDT&interval=5m&limit=20`);
-            const kData = await kRes.json();
-            const prices = kData.map(x => parseFloat(x[4]));
-            const rsi = calculateRSI(prices);
+            // RSI & LIQ
+            const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=${name}USDT&interval=5m&limit=20`);
+            const kD = await k.json();
+            const closes = kD.map(x => parseFloat(x[4]));
             
-            const lastLow = Math.min(...kData.slice(-10, -1).map(x => parseFloat(x[3])));
-            const liq = parseFloat(kData[kData.length-1][3]) < lastLow ? "QUÉT 💧" : "ỔN";
-            
-            document.getElementById(`stat${name}`).innerText = `${rsi.toFixed(1)} / ${liq}`;
-            
-            // Bắn tín hiệu nếu chạm điều kiện (ví dụ RSI cực thấp)
-            if (rsi < 25) sendTele(`🚀 **BÁO ĐỘNG ${name}**\nGiá: ${price}\nRSI: ${rsi.toFixed(1)} - QUÁ BÁN!`);
+            const rsi = calcRSI(closes);
+            document.getElementById(`rsi${name}`).innerText = rsi.toFixed(1);
+            document.getElementById(`rsi${name}`).style.color = rsi < 30 ? "#00ff88" : (rsi > 70 ? "#ff3e3e" : "#fff");
+
+            const low = Math.min(...kD.slice(-12, -1).map(x => parseFloat(x[3])));
+            const isSweep = parseFloat(kD[kD.length-1][3]) < low;
+            document.getElementById(`liq${name}`).innerText = isSweep ? "LIQ SWEEP 💧" : "STABLE";
+            document.getElementById(`liq${name}`).style.color = isSweep ? "#ff3e3e" : "#888";
         }
 
         async function fetchPi() {
             try {
-                const htx = await fetch(PROXY + encodeURIComponent("https://api.huobi.pro/market/detail/merged?symbol=piusdt"));
-                const htxD = await htx.json();
-                const pHTX = htxD.tick.close;
+                const h = await fetch(PROXY + encodeURIComponent("https://api.huobi.pro/market/detail/merged?symbol=piusdt"));
+                const hD = await h.json();
+                const pHTX = hD.tick.close;
                 
-                const bit = await fetch(PROXY + encodeURIComponent("https://api.bitmart.com/spot/v1/ticker?symbol=PI_USDT"));
-                const bitD = await bit.json();
-                const pBit = parseFloat(bitD.data.tickers[0].last_price);
+                const b = await fetch(PROXY + encodeURIComponent("https://api.bitmart.com/spot/v1/ticker?symbol=PI_USDT"));
+                const bD = await b.json();
+                const pBit = parseFloat(bD.data.tickers[0].last_price);
 
                 const diff = ((pHTX - pBit) / pBit) * 100;
-
-                document.getElementById('pricePI').innerText = `$${pHTX.toFixed(2)}`;
-                document.getElementById('diffPI').innerText = `${diff.toFixed(2)}%`;
-                document.getElementById('diffPI').style.color = Math.abs(diff) > 2 ? "#f84960" : "#02c076";
+                document.getElementById('pricePI').innerText = pHTX.toFixed(2);
+                document.getElementById('diffPI').innerText = diff.toFixed(2) + "%";
+                document.getElementById('diffPI').style.color = Math.abs(diff) > 2 ? "#ff3e3e" : "#00ff88";
             } catch (e) {}
         }
 
-        function calculateRSI(prices) {
-            let gains = 0, losses = 0;
-            for (let i = prices.length - 14; i < prices.length; i++) {
-                let d = prices[i] - prices[i-1];
-                if (d >= 0) gains += d; else losses -= d;
+        function calcRSI(closes) {
+            let g = 0, l = 0;
+            for (let i = closes.length - 14; i < closes.length; i++) {
+                let d = closes[i] - closes[i-1];
+                if (d >= 0) g += d; else l -= d;
             }
-            return 100 - (100 / (1 + (gains / (losses || 1))));
-        }
-
-        function sendTele(m) {
-            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}&parse_mode=Markdown`);
+            return 100 - (100 / (1 + (g / (l || 1))));
         }
     </script>
 </body>
