@@ -3,132 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEON TRADING V32.0</title>
+    <title>PREDICTIVE TERMINAL V33</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #050505; --card: #0f1014; --gold: #f3ba2f; --blue: #3773f5; --purple: #a020f0; --green: #00ff88; --red: #ff3e3e; }
-        body { background: var(--bg); color: #e0e0e0; font-family: 'JetBrains Mono', monospace; margin: 0; display: flex; justify-content: center; padding-top: 20px; }
-        .dashboard { width: 95%; max-width: 420px; background: var(--card); border-radius: 24px; padding: 24px; border: 1px solid #1f2226; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        body { background: var(--bg); color: #e0e0e0; font-family: 'JetBrains Mono', monospace; margin: 0; display: flex; justify-content: center; padding: 10px; }
+        .dashboard { width: 100%; max-width: 420px; background: var(--card); border-radius: 24px; padding: 20px; border: 1px solid #1f2226; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
         
-        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
-        .header h2 { font-size: 14px; letter-spacing: 2px; color: #555; margin: 0; }
-        
-        .asset-row { background: #16171d; border-radius: 16px; padding: 18px; margin-bottom: 12px; border: 1px solid transparent; transition: all 0.3s; position: relative; overflow: hidden; }
-        .asset-row:hover { border-color: #333; transform: translateY(-2px); }
-        
-        /* Hiệu ứng tia sáng cho từng loại coin */
-        .btc-line { border-left: 4px solid var(--gold); }
-        .eth-line { border-left: 4px solid var(--blue); }
-        .pi-line { border-left: 4px solid var(--purple); }
+        .header { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
+        .progress-container { width: 100%; height: 2px; background: #222; margin-bottom: 15px; position: relative; }
+        .progress-bar { height: 100%; background: var(--green); width: 0%; transition: width 0.1s linear; }
 
-        .top-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-        .symbol { font-size: 12px; color: #888; font-weight: bold; }
-        .price { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -1px; }
+        .asset-row { background: #16171d; border-radius: 16px; padding: 15px; margin-bottom: 10px; border: 1px solid #222; }
+        .top { display: flex; justify-content: space-between; align-items: center; }
+        .price { font-size: 24px; font-weight: 700; color: #fff; }
         
-        .bottom-info { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid #222; padding-top: 10px; }
-        .label { font-size: 9px; color: #555; text-transform: uppercase; }
-        .val { font-size: 12px; font-weight: bold; }
-
-        .status-bar { text-align: center; font-size: 10px; color: #444; margin-top: 20px; letter-spacing: 1px; }
-        .blink { animation: blinker 1.5s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0; } }
+        .indicator-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; border-top: 1px solid #222; padding-top: 10px; }
+        .label { font-size: 9px; color: #555; display: block; }
+        .val { font-size: 11px; font-weight: bold; color: #aaa; }
+        
+        .signal-alert { color: var(--gold); font-size: 10px; font-weight: bold; margin-top: 5px; text-align: center; display: none; }
     </style>
 </head>
 <body onload="startSystem()">
     <div class="dashboard">
         <div class="header">
-            <h2>TERMINAL V32.0</h2>
-            <div id="clock" style="font-size: 12px; color: var(--green);">00:00:00</div>
+            <span style="font-size: 10px; color: var(--green); letter-spacing: 1px;">● LIVE PREDICTION</span>
+            <span id="clock" style="font-size: 10px; color: #444;">00:00:00</span>
         </div>
+
+        <div class="progress-container"><div id="pBar" class="progress-bar"></div></div>
 
         <!-- BTC -->
-        <div class="asset-row btc-line">
-            <div class="top-info">
-                <span class="symbol">BTC / USDT</span>
-                <span id="priceBTC" class="price">0.00</span>
-            </div>
-            <div class="bottom-info">
-                <div><span class="label">RSI(14)</span><div id="rsiBTC" class="val">--</div></div>
-                <div style="text-align:right;"><span class="label">Market Liquidity</span><div id="liqBTC" class="val">SCANNING</div></div>
-            </div>
-        </div>
-
-        <!-- ETH -->
-        <div class="asset-row eth-line">
-            <div class="top-info">
-                <span class="symbol">ETH / USDT</span>
-                <span id="priceETH" class="price">0.00</span>
-            </div>
-            <div class="bottom-info">
-                <div><span class="label">RSI(14)</span><div id="rsiETH" class="val">--</div></div>
-                <div style="text-align:right;"><span class="label">Market Liquidity</span><div id="liqETH" class="val">SCANNING</div></div>
+        <div class="asset-row" style="border-left: 4px solid var(--gold)">
+            <div class="top"><span style="color:var(--gold); font-size: 12px;">BTC / USDT</span><span id="pBTC" class="price">0.00</span></div>
+            <div id="alertBTC" class="signal-alert">⚠️ SẮP CÓ BIẾN ĐỘNG MẠNH</div>
+            <div class="indicator-box">
+                <div><span class="label">RSI (DỰ BÁO)</span><span id="rsiBTC" class="val">--</span></div>
+                <div style="text-align:right;"><span class="label">ENTRY STATUS</span><span id="stBTC" class="val">WAITING</span></div>
             </div>
         </div>
 
         <!-- PI -->
-        <div class="asset-row pi-line">
-            <div class="top-info">
-                <span class="symbol">PI (IOU)</span>
-                <span id="pricePI" class="price" style="color:var(--purple)">0.00</span>
-            </div>
-            <div class="bottom-info">
-                <div><span class="label">Arbitrage Diff</span><div id="diffPI" class="val">0.00%</div></div>
-                <div style="text-align:right;"><span class="label">Safety Level</span><div id="safePI" class="val" style="color:var(--green)">SECURE</div></div>
+        <div class="asset-row" style="border-left: 4px solid var(--purple)">
+            <div class="top"><span style="color:var(--purple); font-size: 12px;">PI (HTX/BIT)</span><span id="pPI" class="price">0.00</span></div>
+            <div class="indicator-box">
+                <div><span class="label">SÀN LỆCH</span><span id="diffPI" class="val">0.00%</span></div>
+                <div style="text-align:right;"><span class="label">ARBITRAGE</span><span id="stPI" class="val">STABLE</span></div>
             </div>
         </div>
 
-        <div class="status-bar">
-            <span class="blink">●</span> LIVE FEED FROM GLOBAL NODES
+        <div style="text-align: center; font-size: 10px; color: #333; margin-top: 10px;">
+            HỆ THỐNG TỰ ĐỘNG BÁO LỆNH QUA TELEGRAM
         </div>
     </div>
 
     <script>
+        const TOKEN = "8586899878:AAHONzWJqzUMswUPMjn5xaWvYrwDHSH4OYE";
+        const CHAT_ID = "7994694689";
         const PROXY = "https://corsproxy.io/?";
+        let timer = 0;
 
         function startSystem() {
-            updateTick();
-            setInterval(updateTick, 5000);
-            setInterval(() => {
-                document.getElementById('clock').innerText = new Date().toLocaleTimeString();
-            }, 1000);
+            updateAll();
+            setInterval(progress, 100);
+            setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString(), 1000);
         }
 
-        async function updateTick() {
+        function progress() {
+            timer += 2; // Tăng thanh tiến trình
+            document.getElementById('pBar').style.width = timer + "%";
+            if (timer >= 100) { timer = 0; updateAll(); }
+        }
+
+        async function updateAll() {
             try {
-                // Lấy BTC & ETH
-                const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT"]');
+                // Lấy BTC từ Binance (API cực nhanh)
+                const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
                 const data = await res.json();
+                const price = parseFloat(data.price);
+                document.getElementById('pBTC').innerText = price.toLocaleString();
+
+                // Lấy Nến để dự báo RSI
+                const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=20`);
+                const kD = await k.json();
+                const closes = kD.map(x => parseFloat(x[4]));
+                const rsi = calcRSI(closes);
                 
-                render("BTC", data[0]);
-                render("ETH", data[1]);
+                const rsiEl = document.getElementById('rsiBTC');
+                rsiEl.innerText = rsi.toFixed(1);
                 
-                // Lấy PI
+                // Dự báo thời gian có lệnh
+                const stBTC = document.getElementById('stBTC');
+                const alertBTC = document.getElementById('alertBTC');
+                
+                if (rsi < 35) {
+                    stBTC.innerText = "DỰ BÁO: LONG"; stBTC.style.color = var(--green);
+                    alertBTC.style.display = "block";
+                } else if (rsi > 65) {
+                    stBTC.innerText = "DỰ BÁO: SHORT"; stBTC.style.color = var(--red);
+                    alertBTC.style.display = "block";
+                } else {
+                    stBTC.innerText = "WAITING"; stBTC.style.color = "#aaa";
+                    alertBTC.style.display = "none";
+                }
+
+                // Gửi lệnh thật sự nếu RSI < 28 (Quá bán)
+                if (rsi < 28) sendTele(`🚀 **TÍN HIỆU LONG BTC**\nGiá: ${price}\nRSI: ${rsi.toFixed(1)}`);
+
                 fetchPi();
-            } catch (e) { console.log("System Busy"); }
-        }
-
-        async function render(name, data) {
-            const p = parseFloat(data.lastPrice);
-            const el = document.getElementById(`price${name}`);
-            el.innerText = p.toLocaleString(undefined, {minimumFractionDigits: 2});
-            
-            // RSI & LIQ
-            const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=${name}USDT&interval=5m&limit=20`);
-            const kD = await k.json();
-            const closes = kD.map(x => parseFloat(x[4]));
-            
-            const rsi = calcRSI(closes);
-            document.getElementById(`rsi${name}`).innerText = rsi.toFixed(1);
-            document.getElementById(`rsi${name}`).style.color = rsi < 30 ? "#00ff88" : (rsi > 70 ? "#ff3e3e" : "#fff");
-
-            const low = Math.min(...kD.slice(-12, -1).map(x => parseFloat(x[3])));
-            const isSweep = parseFloat(kD[kD.length-1][3]) < low;
-            document.getElementById(`liq${name}`).innerText = isSweep ? "LIQ SWEEP 💧" : "STABLE";
-            document.getElementById(`liq${name}`).style.color = isSweep ? "#ff3e3e" : "#888";
+            } catch (e) { console.log("System Syncing..."); }
         }
 
         async function fetchPi() {
             try {
+                // Lấy Pi qua Proxy để tránh 0.00
                 const h = await fetch(PROXY + encodeURIComponent("https://api.huobi.pro/market/detail/merged?symbol=piusdt"));
                 const hD = await h.json();
                 const pHTX = hD.tick.close;
@@ -138,9 +127,14 @@
                 const pBit = parseFloat(bD.data.tickers[0].last_price);
 
                 const diff = ((pHTX - pBit) / pBit) * 100;
-                document.getElementById('pricePI').innerText = pHTX.toFixed(2);
+                document.getElementById('pPI').innerText = "$" + pHTX.toFixed(2);
                 document.getElementById('diffPI').innerText = diff.toFixed(2) + "%";
-                document.getElementById('diffPI').style.color = Math.abs(diff) > 2 ? "#ff3e3e" : "#00ff88";
+                
+                if (Math.abs(diff) > 4) {
+                    document.getElementById('stPI').innerText = "ARBITRAGE ALERT!";
+                    document.getElementById('stPI').style.color = var(--red);
+                    sendTele(`🥧 **PI ARBITRAGE**\nLệch: ${diff.toFixed(2)}%\nGiá HTX: $${pHTX}`);
+                }
             } catch (e) {}
         }
 
@@ -151,6 +145,10 @@
                 if (d >= 0) g += d; else l -= d;
             }
             return 100 - (100 / (1 + (g / (l || 1))));
+        }
+
+        function sendTele(m) {
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(m)}&parse_mode=Markdown`);
         }
     </script>
 </body>
